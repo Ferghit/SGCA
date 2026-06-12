@@ -64,7 +64,9 @@ model Usuario {
   requerimientosAprobados Requerimiento[]  @relation("AprobadoPor")
   notificacionesEnviadas  Notificacion[]   @relation("Emisor")
   notificacionesRecibidas Notificacion[]   @relation("Receptor")
+  solicitudesCotizacionComoAnalista SolicitudCotizacion[] @relation("AnalistaCotizacion")
   auditoria               Auditoria[]
+  
 
   @@map("usuarios")
 }
@@ -105,6 +107,7 @@ model Requerimiento {
   detalles       RequerimientoDetalle[]
   historial      HistorialRequerimiento[]
   notificaciones Notificacion[]
+  solicitudesCotizacion SolicitudCotizacion[]
 
   @@map("requerimientos")
 }
@@ -149,41 +152,89 @@ model Proveedor {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  cotizaciones SolicitudCotizacion[]
+  ofertasProveedor OfertaProveedor[] @relation("OfertasProveedor")
+  solicitudesGanadas SolicitudCotizacion[] @relation("ProveedorGanador")
   ordenes      OrdenCompra[]
   facturas     Factura[]
 
   @@map("proveedores")
 }
 
-model SolicitudCotizacion {
-  id              Int      @id @default(autoincrement())
-  codigo          String   @unique
-  proveedorId     Int
-  requerimientoId Int?
-  fechaLimite     DateTime
-  estado          String   @default("ENVIADA")
-  descripcion     String?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+// ─── NUEVOS ENUMS para Cotizaciones ───────────────────────────────────────────
 
-  proveedor Proveedor         @relation(fields: [proveedorId], references: [id])
-  ofertas   OfertaProveedor[]
+enum EstadoSolicitudCotizacion {
+  ABIERTA
+  CERRADA
+  ADJUDICADA
+  CANCELADA
+}
+
+enum EstadoOferta {
+  RECIBIDA
+  SELECCIONADA
+  RECHAZADA
+}
+
+// ─── MODELO ACTUALIZADO ────────────────────────────────────────────────────────
+
+model SolicitudCotizacion {
+  id              Int                        @id @default(autoincrement())
+  codigo          String                     @unique
+  requerimientoId Int
+  analistaId      Int
+  titulo          String
+  descripcion     String?
+  fechaLimite     DateTime
+  estado          EstadoSolicitudCotizacion  @default(ABIERTA)
+  proveedorGanadorId Int?
+  justificacionSeleccion String?
+  createdAt       DateTime                   @default(now())
+  updatedAt       DateTime                   @updatedAt
+
+  requerimiento   Requerimiento              @relation(fields: [requerimientoId], references: [id])
+  analista        Usuario                    @relation("AnalistaCotizacion", fields: [analistaId], references: [id])
+  proveedorGanador Proveedor?               @relation("ProveedorGanador", fields: [proveedorGanadorId], references: [id])
+  items           ItemSolicitudCotizacion[]
+  ofertas         OfertaProveedor[]
 
   @@map("solicitudes_cotizacion")
 }
 
-model OfertaProveedor {
-  id                    Int      @id @default(autoincrement())
+model ItemSolicitudCotizacion {
+  id                    Int                 @id @default(autoincrement())
   solicitudCotizacionId Int
-  monto                 Decimal  @db.Decimal(10, 2)
-  plazoEntrega          Int
+  descripcion           String
+  cantidad              Decimal             @db.Decimal(10, 2)
+  unidadMedida          String
+
+  solicitudCotizacion   SolicitudCotizacion @relation(fields: [solicitudCotizacionId], references: [id], onDelete: Cascade)
+
+  @@map("items_solicitud_cotizacion")
+}
+
+model OfertaProveedor {
+  id                    Int          @id @default(autoincrement())
+  solicitudCotizacionId Int
+  proveedorId           Int
+  montoTotal            Decimal      @db.Decimal(10, 2)
+  plazoEntregaDias      Int
   condicionesPago       String?
-  estado                String   @default("RECIBIDA")
-  createdAt             DateTime @default(now())
+  notasAdicionales      String?
+  archivoAdjuntoUrl     String?
+  estado                EstadoOferta @default(RECIBIDA)
+  // Ranking automático (calculado al cierre)
+  puntajePrecio         Decimal?     @db.Decimal(5, 2)
+  puntajePlazo          Decimal?     @db.Decimal(5, 2)
+  puntajeHistorial      Decimal?     @db.Decimal(5, 2)
+  puntajeTotal          Decimal?     @db.Decimal(5, 2)
+  posicionRanking       Int?
+  createdAt             DateTime     @default(now())
+  updatedAt             DateTime     @updatedAt
 
-  solicitudCotizacion SolicitudCotizacion @relation(fields: [solicitudCotizacionId], references: [id])
+  solicitudCotizacion   SolicitudCotizacion @relation(fields: [solicitudCotizacionId], references: [id])
+  proveedor             Proveedor           @relation("OfertasProveedor", fields: [proveedorId], references: [id])
 
+  @@unique([solicitudCotizacionId, proveedorId])
   @@map("ofertas_proveedor")
 }
 

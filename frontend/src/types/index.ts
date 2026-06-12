@@ -109,3 +109,61 @@ export interface EstadisticasJefe {
   rechazados: number;
   enRevision: number;
 }
+
+// ── Cotizaciones ─────────────────────────────────────────────────────────────
+
+export type EstadoSolicitudCotizacion =
+  | 'ABIERTA'
+  | 'CERRADA'
+  | 'ADJUDICADA'
+  | 'CANCELADA';
+
+export type EstadoOferta = 'RECIBIDA' | 'SELECCIONADA' | 'RECHAZADA';
+
+export interface ItemSolicitudCotizacion {
+  id: number;
+  solicitudCotizacionId: number;
+  descripcion: string;
+  cantidad: number;
+  unidadMedida: string;
+}
+
+export interface OfertaProveedor {
+  id: number;
+  solicitudCotizacionId: number;
+  proveedorId: number;
+  montoTotal: number;
+  plazoEntregaDias: number;
+  condicionesPago?: string;
+  notasAdicionales?: string;
+  archivoAdjuntoUrl?: string;
+  estado: EstadoOferta;
+  puntajePrecio?: number;
+  puntajePlazo?: number;
+  puntajeHistorial?: number;
+  puntajeTotal?: number;
+  posicionRanking?: number;
+  createdAt: string;
+  proveedor: { id: number; razonSocial: string; ruc: string; email?: string };
+  solicitudCotizacion?: SolicitudCotizacion;
+}
+
+export interface SolicitudCotizacion {
+  id: number;
+  codigo: string;
+  requerimientoId: number;
+  analistaId: number;
+  titulo: string;
+  descripcion?: string;
+  fechaLimite: string;
+  estado: EstadoSolicitudCotizacion;
+  proveedorGanadorId?: number;
+  justificacionSeleccion?: string;
+  createdAt: string;
+  updatedAt: string;
+  requerimiento?: { id: number; codigo: string; descripcion?: string };
+  analista?: { id: number; nombre: string; apellido: string };
+  items: ItemSolicitudCotizacion[];
+  ofertas: OfertaProveedor[];
+  proveedorGanador?: { id: number; razonSocial: string };
+}

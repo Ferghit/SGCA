@@ -45,6 +45,7 @@ const MENU_BY_ROL: Record<Rol, MenuItem[]> = {
   ANALISTA_COMPRAS: [
     { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
     { label: 'Requerimientos', href: '/requerimientos', icon: ClipboardList },
+    { label: 'Solicitudes de Cotización', href: '/cotizaciones', icon: FileText },
     { label: 'Ordenes de Compra', href: '/ordenes-compra', icon: ShoppingCart },
     { label: 'Notificaciones', href: '/notificaciones', icon: Bell },
   ],
@@ -56,7 +57,8 @@ const MENU_BY_ROL: Record<Rol, MenuItem[]> = {
   ],
   PROVEEDOR: [
     { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-    { label: 'Cotizaciones', href: '/cotizaciones', icon: FileText },
+    { label: 'Cotizaciones Abiertas', href: '/cotizaciones', icon: FileText },
+    { label: 'Mis Cotizaciones', href: '/cotizaciones/mis-ofertas', icon: ShoppingCart },
     { label: 'Notificaciones', href: '/notificaciones', icon: Bell },
   ],
   ENCARGADO_ALMACEN: [
@@ -92,7 +94,7 @@ export default function Sidebar() {
       <nav className="flex-1 px-3 py-4 space-y-1">
         {menuItems.map((item) => {
           const Icon = item.icon;
-          const isActive = pathname === item.href || (item.href !== '/dashboard' && pathname.startsWith(item.href));
+          const isActive = pathname === item.href;
 
           return (
             <Link
