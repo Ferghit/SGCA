@@ -8,11 +8,13 @@ export function formatDate(dateString: string): string {
   });
 }
 
-export function formatDateShort(dateString: string): string {
-  return new Date(dateString).toLocaleDateString('es-PE', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
+export function formatDateShort(dateStr: string): string {
+  return new Date(dateStr).toLocaleDateString('es-PE', {
+    year: 'numeric', 
+    month: 'short', 
+    day: 'numeric',
+    hour: '2-digit', 
+    minute: '2-digit',
   });
 }
 

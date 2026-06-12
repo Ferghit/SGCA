@@ -54,7 +54,23 @@ async function main() {
 
   console.log(`Usuarios creados: ${usuarios.length}`);
 
-  // ─── PRODUCTOS ───────────────────────────────────────────────────────────────
+  // Proveedor (vinculado por email con el usuario PROVEEDOR)
+  const proveedor = await prisma.proveedor.upsert({
+    where: { ruc: '20123456789' },
+    update: { email: 'proveedor@sgca.com' },
+    create: {
+      ruc: '20123456789',
+      razonSocial: 'Proveedor Demo S.A.C.',
+      email: 'proveedor@sgca.com',
+      contacto: 'Juan Pérez',
+      telefono: '987654321',
+      direccion: 'Av. Ejemplo 123, Trujillo',
+    },
+  });
+
+  console.log(`Proveedor creado: ${proveedor.razonSocial}`);
+
+  // ─── Productos ───────────────────────────────────────────────────────────────
   const productos = await Promise.all([
     prisma.producto.upsert({
       where: { codigo: 'PRD-001' },

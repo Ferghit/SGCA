@@ -45,6 +45,7 @@ const MENU_BY_ROL: Record<Rol, MenuItem[]> = {
   ANALISTA_COMPRAS: [
     { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
     { label: 'Requerimientos', href: '/requerimientos', icon: ClipboardList },
+    { label: 'Solicitudes de Cotización', href: '/cotizaciones', icon: FileText },
     { label: 'Ordenes de Compra', href: '/ordenes-compra', icon: ShoppingCart },
     { label: 'Notificaciones', href: '/notificaciones', icon: Bell },
   ],
