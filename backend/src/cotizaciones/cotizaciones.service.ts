@@ -8,7 +8,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CreateSolicitudCotizacionDto } from './dto/create-solicitud.dto';
 import { CreateOfertaDto } from './dto/create-oferta.dto';
 import { SeleccionarGanadorDto } from './dto/seleccionar-ganador.dto';
-import { EstadoSolicitudCotizacion, EstadoRequerimiento } from '@prisma/client';
+import { EstadoSolicitudCotizacion, EstadoRequerimiento, EstadoOferta } from '@prisma/client';
 
 @Injectable()
 export class CotizacionesService {
@@ -47,7 +47,7 @@ export class CotizacionesService {
     const existente = await this.prisma.solicitudCotizacion.findFirst({
       where: {
         requerimientoId: dto.requerimientoId,
-        estado: { in: ['ABIERTA', 'CERRADA'] },
+        estado: { in: [EstadoSolicitudCotizacion.ABIERTA, EstadoSolicitudCotizacion.CERRADA] },
       },
     });
     if (existente) {
@@ -56,39 +56,95 @@ export class CotizacionesService {
       );
     }
 
-    const codigo = await this.generarCodigo();
+    // Función para generar código y crear solicitud en transacción
+    const crearConCodigo = async () => {
+      return this.prisma.$transaction(async (tx) => {
+        const year = new Date().getFullYear();
+        const ultimo = await tx.solicitudCotizacion.findFirst({
+          where: { codigo: { startsWith: `COT-${year}-` } },
+          orderBy: { codigo: 'desc' },
+        });
+        const siguiente = ultimo ? parseInt(ultimo.codigo.split('-')[2], 10) + 1 : 1;
+        const codigo = `COT-${year}-${String(siguiente).padStart(3, '0')}`;
 
-    return this.prisma.solicitudCotizacion.create({
-      data: {
-        codigo,
-        requerimientoId: dto.requerimientoId,
-        analistaId,
-        titulo: dto.titulo,
-        descripcion: dto.descripcion,
-        fechaLimite: new Date(dto.fechaLimite),
-        items: {
-          create: dto.items.map((item) => ({
-            descripcion: item.descripcion,
-            cantidad: item.cantidad,
-            unidadMedida: item.unidadMedida,
-          })),
-        },
-      },
-      include: {
-        requerimiento: true,
-        analista: { select: { id: true, nombre: true, apellido: true } },
-        items: true,
-        ofertas: true,
-      },
-    });
+        return tx.solicitudCotizacion.create({
+          data: {
+            codigo,
+            requerimientoId: dto.requerimientoId,
+            analistaId,
+            titulo: dto.titulo,
+            descripcion: dto.descripcion,
+            fechaLimite: new Date(dto.fechaLimite),
+            items: {
+              create: dto.items.map((item) => ({
+                descripcion: item.descripcion,
+                cantidad: item.cantidad,
+                unidadMedida: item.unidadMedida,
+              })),
+            },
+          },
+          include: {
+            requerimiento: true,
+            analista: { select: { id: true, nombre: true, apellido: true } },
+            items: true,
+            ofertas: true,
+          },
+        });
+      }, {
+        isolationLevel: 'Serializable',
+      });
+    };
+
+    // Intentar hasta 3 veces en caso de conflicto de código único
+    let intentos = 0;
+    const maxIntentos = 3;
+    
+    while (intentos < maxIntentos) {
+      try {
+        return await crearConCodigo();
+      } catch (error: any) {
+        // Verificar si es un error de constraint único en el campo código
+        if (error.code === 'P2002' && error.meta?.target?.includes('codigo')) {
+          intentos++;
+          if (intentos >= maxIntentos) {
+            throw new BadRequestException('No se pudo generar un código único. Por favor, intente nuevamente.');
+          }
+          // Esperar un momento antes de reintentar (exponential backoff simple)
+          await new Promise(resolve => setTimeout(resolve, 100 * intentos));
+        } else {
+          throw error;
+        }
+      }
+    }
+
+    throw new BadRequestException('No se pudo generar un código único. Por favor, intente nuevamente.');
   }
 
   async findAllSolicitudes(userRol: string, userId: number) {
     const where: any = {};
 
-    // Proveedor: solo ve las abiertas
+    // Proveedor: ve las abiertas + las que tiene oferta
     if (userRol === 'PROVEEDOR') {
-      where.estado = EstadoSolicitudCotizacion.ABIERTA;
+      // Buscar el proveedor asociado al usuario
+      const usuario = await this.prisma.usuario.findUnique({ where: { id: userId } });
+      
+      if (!usuario) {
+        throw new NotFoundException('Usuario no encontrado');
+      }
+
+      const proveedor = await this.prisma.proveedor.findFirst({
+        where: { email: usuario.email },
+      });
+      
+      if (proveedor) {
+        where.OR = [
+          { estado: EstadoSolicitudCotizacion.ABIERTA },
+          { ofertas: { some: { proveedorId: proveedor.id } } }
+        ];
+      } else {
+        // Si no hay proveedor, solo ve abiertas
+        where.estado = EstadoSolicitudCotizacion.ABIERTA;
+      }
     }
 
     return this.prisma.solicitudCotizacion.findMany({
@@ -164,13 +220,34 @@ export class CotizacionesService {
     const ofertas = await this.prisma.ofertaProveedor.findMany({
       where: { solicitudCotizacionId: solicitudId },
       include: {
-        proveedor: {
-          include: { ofertasProveedor: { where: { estado: 'SELECCIONADA' } } },
-        },
+        proveedor: true,
       },
     });
 
     if (ofertas.length === 0) return [];
+
+    // Obtener todas las ofertas de cada proveedor para calcular su historial
+    const proveedorIds = ofertas.map(o => o.proveedorId);
+    const [totalOfertasPorProveedor, ofertasGanadasPorProveedor] = await Promise.all([
+      this.prisma.ofertaProveedor.groupBy({
+        by: ['proveedorId'],
+        where: { proveedorId: { in: proveedorIds } },
+        _count: { id: true },
+      }),
+      this.prisma.ofertaProveedor.groupBy({
+        by: ['proveedorId'],
+        where: { proveedorId: { in: proveedorIds }, estado: EstadoOferta.SELECCIONADA },
+        _count: { id: true },
+      }),
+    ]);
+
+    // Convertir a objetos para fácil acceso
+    const totalMap = new Map(
+      totalOfertasPorProveedor.map(p => [p.proveedorId, p._count.id])
+    );
+    const ganadasMap = new Map(
+      ofertasGanadasPorProveedor.map(p => [p.proveedorId, p._count.id])
+    );
 
     // Normalizar: menor precio → mayor puntaje, menor plazo → mayor puntaje
     const montos = ofertas.map((o) => Number(o.montoTotal));
@@ -195,9 +272,10 @@ export class CotizacionesService {
           ? 100
           : ((maxPlazo - o.plazoEntregaDias) / (maxPlazo - minPlazo)) * 100;
 
-      // Historial: % de veces que fue seleccionado sobre total de ofertas
-      const totalOfertas = o.proveedor.ofertasProveedor.length;
-      const puntajeHistorial = totalOfertas > 0 ? Math.min(100, totalOfertas * 10) : 50;
+      // Historial: % de ofertas ganadas
+      const total = totalMap.get(o.proveedorId) || 0;
+      const ganadas = ganadasMap.get(o.proveedorId) || 0;
+      const puntajeHistorial = total > 0 ? (ganadas / total) * 100 : 50;
 
       const puntajeTotal =
         puntajePrecio * pesos.precio +
@@ -233,8 +311,13 @@ export class CotizacionesService {
   async enviarOferta(dto: CreateOfertaDto, userId: number) {
     // Buscar proveedor por email del usuario
     const usuario = await this.prisma.usuario.findUnique({ where: { id: userId } });
+
+    if (!usuario) {
+      throw new NotFoundException('Usuario no encontrado');
+    }
+
     const proveedorRegistrado = await this.prisma.proveedor.findFirst({
-      where: { email: usuario?.email },
+      where: { email: usuario.email },
     });
 
     if (!proveedorRegistrado) {
@@ -344,13 +427,13 @@ export class CotizacionesService {
     // Marcar todas las ofertas como rechazadas
     await this.prisma.ofertaProveedor.updateMany({
       where: { solicitudCotizacionId: solicitudId },
-      data: { estado: 'RECHAZADA' },
+      data: { estado: EstadoOferta.RECHAZADA },
     });
 
     // Marcar la seleccionada
     await this.prisma.ofertaProveedor.update({
       where: { id: dto.ofertaId },
-      data: { estado: 'SELECCIONADA' },
+      data: { estado: EstadoOferta.SELECCIONADA },
     });
 
     // Actualizar solicitud con ganador y justificación
@@ -379,7 +462,7 @@ export class CotizacionesService {
     return this.prisma.requerimiento.findMany({
       where: {
         estado: EstadoRequerimiento.APROBADO,
-        solicitudesCotizacion: { none: { estado: { in: ['ABIERTA', 'CERRADA', 'ADJUDICADA'] } } },
+        solicitudesCotizacion: { none: { estado: { in: [EstadoSolicitudCotizacion.ABIERTA, EstadoSolicitudCotizacion.CERRADA, EstadoSolicitudCotizacion.ADJUDICADA] } } },
       },
       include: {
         detalles: { include: { producto: true } },
