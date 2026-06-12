@@ -145,6 +145,7 @@ export interface OfertaProveedor {
   posicionRanking?: number;
   createdAt: string;
   proveedor: { id: number; razonSocial: string; ruc: string; email?: string };
+  solicitudCotizacion?: SolicitudCotizacion;
 }
 
 export interface SolicitudCotizacion {

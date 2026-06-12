@@ -38,8 +38,16 @@ export default function DetalleSolicitudPage() {
     );
   }
 
+  // Función para convertir valores Decimal/string a number de forma segura
+  const toNumber = (value: any): number | null => {
+    if (value == null) return null;
+    if (typeof value === 'number') return value;
+    const num = Number(value);
+    return isNaN(num) ? null : num;
+  };
+
   const ofertasOrdenadas = [...(sol.ofertas || [])].sort((a, b) =>
-    (b.puntajeTotal ?? 0) - (a.puntajeTotal ?? 0),
+    (toNumber(b.puntajeTotal) ?? 0) - (toNumber(a.puntajeTotal) ?? 0),
   );
 
   const recomendada = ofertasOrdenadas[0];
@@ -219,7 +227,7 @@ export default function DetalleSolicitudPage() {
                     </div>
                     <div className="text-right">
                       <p className="text-2xl font-bold" style={{ color: '#006D77' }}>
-                        {oferta.puntajeTotal != null ? oferta.puntajeTotal.toFixed(1) : '—'}
+                        {toNumber(oferta.puntajeTotal) != null ? toNumber(oferta.puntajeTotal)!.toFixed(1) : '—'}
                       </p>
                       <p className="text-xs text-gray-500">pts. totales</p>
                     </div>
@@ -228,17 +236,17 @@ export default function DetalleSolicitudPage() {
                   <div className="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
                     <div>
                       <p className="text-xs text-gray-500 mb-0.5 flex items-center gap-1"><DollarSign className="w-3 h-3" /> Monto</p>
-                      <p className="font-semibold text-gray-800">S/. {Number(oferta.montoTotal).toLocaleString('es-PE', { minimumFractionDigits: 2 })}</p>
-                      <p className="text-xs text-gray-400">Ptje: {oferta.puntajePrecio?.toFixed(1) ?? '—'}</p>
+                      <p className="font-semibold text-gray-800">S/. {toNumber(oferta.montoTotal)?.toLocaleString('es-PE', { minimumFractionDigits: 2 })}</p>
+                      <p className="text-xs text-gray-400">Ptje: {toNumber(oferta.puntajePrecio)?.toFixed(1) ?? '—'}</p>
                     </div>
                     <div>
                       <p className="text-xs text-gray-500 mb-0.5 flex items-center gap-1"><Truck className="w-3 h-3" /> Plazo</p>
                       <p className="font-semibold text-gray-800">{oferta.plazoEntregaDias} días</p>
-                      <p className="text-xs text-gray-400">Ptje: {oferta.puntajePlazo?.toFixed(1) ?? '—'}</p>
+                      <p className="text-xs text-gray-400">Ptje: {toNumber(oferta.puntajePlazo)?.toFixed(1) ?? '—'}</p>
                     </div>
                     <div>
                       <p className="text-xs text-gray-500 mb-0.5 flex items-center gap-1"><Star className="w-3 h-3" /> Historial</p>
-                      <p className="text-xs text-gray-400">Ptje: {oferta.puntajeHistorial?.toFixed(1) ?? '—'}</p>
+                      <p className="text-xs text-gray-400">Ptje: {toNumber(oferta.puntajeHistorial)?.toFixed(1) ?? '—'}</p>
                     </div>
                     {oferta.condicionesPago && (
                       <div>

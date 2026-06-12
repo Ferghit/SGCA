@@ -309,7 +309,10 @@ export class CotizacionesService {
       where: { proveedorId: proveedor.id },
       include: {
         solicitudCotizacion: {
-          include: { items: true, requerimiento: { select: { codigo: true } } },
+          include: {
+            items: true,
+            requerimiento: { select: { id: true, codigo: true } },
+          },
         },
       },
       orderBy: { createdAt: 'desc' },
@@ -420,11 +423,27 @@ export class CotizacionesService {
       throw new BadRequestException('La solicitud ya está cerrada o adjudicada');
     }
 
+    // Primero calculamos el ranking
     await this.calcularRanking(solicitudId);
 
-    return this.prisma.solicitudCotizacion.update({
+    // Luego cerramos la solicitud
+    const updated = await this.prisma.solicitudCotizacion.update({
       where: { id: solicitudId },
       data: { estado: EstadoSolicitudCotizacion.CERRADA },
+      include: {
+        requerimiento: { select: { id: true, codigo: true, descripcion: true } },
+        analista: { select: { id: true, nombre: true, apellido: true } },
+        items: true,
+        ofertas: {
+          include: {
+            proveedor: { select: { id: true, razonSocial: true, ruc: true, email: true } },
+          },
+          orderBy: { puntajeTotal: 'desc' },
+        },
+        proveedorGanador: true,
+      },
     });
+
+    return updated;
   }
 }

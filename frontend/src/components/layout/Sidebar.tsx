@@ -57,7 +57,8 @@ const MENU_BY_ROL: Record<Rol, MenuItem[]> = {
   ],
   PROVEEDOR: [
     { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-    { label: 'Cotizaciones', href: '/cotizaciones', icon: FileText },
+    { label: 'Cotizaciones Abiertas', href: '/cotizaciones', icon: FileText },
+    { label: 'Mis Cotizaciones', href: '/cotizaciones/mis-ofertas', icon: ShoppingCart },
     { label: 'Notificaciones', href: '/notificaciones', icon: Bell },
   ],
   ENCARGADO_ALMACEN: [
