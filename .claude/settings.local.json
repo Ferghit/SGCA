@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(Get-ChildItem -Path \"C:\\\\UNT-SISTEMAS\\\\SEPTIMO CICLO\\\\Cadena de suministro\\\\SGCA\" -Recurse -File | Where-Object { $_.FullName -notmatch \"node_modules\" } | Sort-Object FullName | Select-Object @{N=\"Archivo\";E={$_.FullName.Replace\\(\"C:\\\\UNT-SISTEMAS\\\\SEPTIMO CICLO\\\\Cadena de suministro\\\\SGCA\\\\\",\"\"\\)}} | Format-Table -AutoSize)",
+      "Bash(git init *)",
+      "Bash(git remote *)",
+      "Bash(git add *)"
+    ]
+  }
+}

@@ -1,0 +1,345 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Rol {
+  ADMIN
+  TRABAJADOR
+  JEFE_AREA
+  ANALISTA_COMPRAS
+  GERENTE
+  PROVEEDOR
+  ENCARGADO_ALMACEN
+  CONTADOR
+}
+
+enum EstadoRequerimiento {
+  BORRADOR
+  PENDIENTE
+  APROBADO
+  RECHAZADO
+  EN_REVISION
+}
+
+enum Prioridad {
+  BAJA
+  MEDIA
+  ALTA
+  URGENTE
+}
+
+enum EstadoOrdenCompra {
+  BORRADOR
+  APROBADA
+  ENVIADA
+  RECIBIDA_PARCIAL
+  RECIBIDA_COMPLETA
+  CANCELADA
+}
+
+enum EstadoFactura {
+  PENDIENTE
+  APROBADA
+  PAGADA
+  RECHAZADA
+}
+
+model Usuario {
+  id        Int      @id @default(autoincrement())
+  nombre    String
+  apellido  String
+  email     String   @unique
+  password  String
+  rol       Rol
+  activo    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  requerimientos          Requerimiento[]  @relation("SolicitadoPor")
+  requerimientosAprobados Requerimiento[]  @relation("AprobadoPor")
+  notificacionesEnviadas  Notificacion[]   @relation("Emisor")
+  notificacionesRecibidas Notificacion[]   @relation("Receptor")
+  auditoria               Auditoria[]
+
+  @@map("usuarios")
+}
+
+model Producto {
+  id                Int      @id @default(autoincrement())
+  codigo            String   @unique
+  nombre            String
+  descripcion       String?
+  unidadMedida      String
+  categoria         String
+  precioReferencial Decimal? @db.Decimal(10, 2)
+  activo            Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  detallesRequerimiento RequerimientoDetalle[]
+  inventario            Inventario[]
+
+  @@map("productos")
+}
+
+model Requerimiento {
+  id             Int                 @id @default(autoincrement())
+  codigo         String              @unique
+  solicitanteId  Int
+  aprobadorId    Int?
+  estado         EstadoRequerimiento @default(BORRADOR)
+  prioridad      Prioridad           @default(MEDIA)
+  fechaRequerida DateTime
+  descripcion    String?
+  comentarioJefe String?
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+
+  solicitante    Usuario                  @relation("SolicitadoPor", fields: [solicitanteId], references: [id])
+  aprobador      Usuario?                 @relation("AprobadoPor", fields: [aprobadorId], references: [id])
+  detalles       RequerimientoDetalle[]
+  historial      HistorialRequerimiento[]
+  notificaciones Notificacion[]
+
+  @@map("requerimientos")
+}
+
+model RequerimientoDetalle {
+  id              Int     @id @default(autoincrement())
+  requerimientoId Int
+  productoId      Int
+  cantidad        Decimal @db.Decimal(10, 2)
+  unidadMedida    String
+  observacion     String?
+
+  requerimiento Requerimiento @relation(fields: [requerimientoId], references: [id], onDelete: Cascade)
+  producto      Producto      @relation(fields: [productoId], references: [id])
+
+  @@map("requerimiento_detalles")
+}
+
+model HistorialRequerimiento {
+  id              Int                  @id @default(autoincrement())
+  requerimientoId Int
+  estadoAnterior  EstadoRequerimiento?
+  estadoNuevo     EstadoRequerimiento
+  comentario      String?
+  usuarioId       Int?
+  createdAt       DateTime             @default(now())
+
+  requerimiento Requerimiento @relation(fields: [requerimientoId], references: [id], onDelete: Cascade)
+
+  @@map("historial_requerimientos")
+}
+
+model Proveedor {
+  id          Int      @id @default(autoincrement())
+  ruc         String   @unique
+  razonSocial String
+  contacto    String?
+  telefono    String?
+  email       String?
+  direccion   String?
+  activo      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  cotizaciones SolicitudCotizacion[]
+  ordenes      OrdenCompra[]
+  facturas     Factura[]
+
+  @@map("proveedores")
+}
+
+model SolicitudCotizacion {
+  id              Int      @id @default(autoincrement())
+  codigo          String   @unique
+  proveedorId     Int
+  requerimientoId Int?
+  fechaLimite     DateTime
+  estado          String   @default("ENVIADA")
+  descripcion     String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  proveedor Proveedor         @relation(fields: [proveedorId], references: [id])
+  ofertas   OfertaProveedor[]
+
+  @@map("solicitudes_cotizacion")
+}
+
+model OfertaProveedor {
+  id                    Int      @id @default(autoincrement())
+  solicitudCotizacionId Int
+  monto                 Decimal  @db.Decimal(10, 2)
+  plazoEntrega          Int
+  condicionesPago       String?
+  estado                String   @default("RECIBIDA")
+  createdAt             DateTime @default(now())
+
+  solicitudCotizacion SolicitudCotizacion @relation(fields: [solicitudCotizacionId], references: [id])
+
+  @@map("ofertas_proveedor")
+}
+
+model OrdenCompra {
+  id                   Int               @id @default(autoincrement())
+  numero               String            @unique
+  proveedorId          Int
+  estado               EstadoOrdenCompra @default(BORRADOR)
+  montoTotal           Decimal           @db.Decimal(10, 2)
+  fechaEmision         DateTime          @default(now())
+  fechaEntregaEsperada DateTime?
+  observaciones        String?
+  createdAt            DateTime          @default(now())
+  updatedAt            DateTime          @updatedAt
+
+  proveedor   Proveedor            @relation(fields: [proveedorId], references: [id])
+  detalles    OrdenCompraDetalle[]
+  recepciones Recepcion[]
+  facturas    Factura[]
+
+  @@map("ordenes_compra")
+}
+
+model OrdenCompraDetalle {
+  id             Int     @id @default(autoincrement())
+  ordenCompraId  Int
+  productoId     Int?
+  descripcion    String
+  cantidad       Decimal @db.Decimal(10, 2)
+  precioUnitario Decimal @db.Decimal(10, 2)
+  subtotal       Decimal @db.Decimal(10, 2)
+
+  ordenCompra OrdenCompra @relation(fields: [ordenCompraId], references: [id], onDelete: Cascade)
+
+  @@map("orden_compra_detalles")
+}
+
+model Recepcion {
+  id             Int      @id @default(autoincrement())
+  ordenCompraId  Int
+  fechaRecepcion DateTime @default(now())
+  responsableId  Int?
+  estado         String   @default("COMPLETA")
+  observaciones  String?
+  createdAt      DateTime @default(now())
+
+  ordenCompra OrdenCompra        @relation(fields: [ordenCompraId], references: [id])
+  detalles    RecepcionDetalle[]
+  guias       GuiaRemision[]
+
+  @@map("recepciones")
+}
+
+model RecepcionDetalle {
+  id               Int     @id @default(autoincrement())
+  recepcionId      Int
+  productoId       Int?
+  descripcion      String
+  cantidadEsperada Decimal @db.Decimal(10, 2)
+  cantidadRecibida Decimal @db.Decimal(10, 2)
+  observacion      String?
+
+  recepcion Recepcion @relation(fields: [recepcionId], references: [id], onDelete: Cascade)
+
+  @@map("recepcion_detalles")
+}
+
+model GuiaRemision {
+  id           Int      @id @default(autoincrement())
+  numero       String   @unique
+  recepcionId  Int
+  emisor       String
+  receptor     String
+  fechaEmision DateTime
+  createdAt    DateTime @default(now())
+
+  recepcion Recepcion @relation(fields: [recepcionId], references: [id])
+
+  @@map("guias_remision")
+}
+
+model Inventario {
+  id         Int      @id @default(autoincrement())
+  productoId Int      @unique
+  cantidad   Decimal  @db.Decimal(10, 2) @default(0)
+  ubicacion  String?
+  updatedAt  DateTime @updatedAt
+
+  producto Producto @relation(fields: [productoId], references: [id])
+
+  @@map("inventario")
+}
+
+model Factura {
+  id               Int           @id @default(autoincrement())
+  numero           String        @unique
+  proveedorId      Int
+  ordenCompraId    Int?
+  monto            Decimal       @db.Decimal(10, 2)
+  igv              Decimal       @db.Decimal(10, 2)
+  total            Decimal       @db.Decimal(10, 2)
+  fechaEmision     DateTime
+  fechaVencimiento DateTime?
+  estado           EstadoFactura @default(PENDIENTE)
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  proveedor   Proveedor    @relation(fields: [proveedorId], references: [id])
+  ordenCompra OrdenCompra? @relation(fields: [ordenCompraId], references: [id])
+  pagos       Pago[]
+
+  @@map("facturas")
+}
+
+model Pago {
+  id         Int      @id @default(autoincrement())
+  facturaId  Int
+  monto      Decimal  @db.Decimal(10, 2)
+  fechaPago  DateTime @default(now())
+  metodoPago String
+  referencia String?
+  createdAt  DateTime @default(now())
+
+  factura Factura @relation(fields: [facturaId], references: [id])
+
+  @@map("pagos")
+}
+
+model Notificacion {
+  id              Int      @id @default(autoincrement())
+  emisorId        Int?
+  receptorId      Int
+  requerimientoId Int?
+  titulo          String
+  mensaje         String
+  leida           Boolean  @default(false)
+  createdAt       DateTime @default(now())
+
+  emisor        Usuario?       @relation("Emisor", fields: [emisorId], references: [id])
+  receptor      Usuario        @relation("Receptor", fields: [receptorId], references: [id])
+  requerimiento Requerimiento? @relation(fields: [requerimientoId], references: [id])
+
+  @@map("notificaciones")
+}
+
+model Auditoria {
+  id         Int      @id @default(autoincrement())
+  usuarioId  Int?
+  accion     String
+  tabla      String
+  registroId Int?
+  detalle    String?
+  ip         String?
+  createdAt  DateTime @default(now())
+
+  usuario Usuario? @relation(fields: [usuarioId], references: [id])
+
+  @@map("auditoria")
+}
