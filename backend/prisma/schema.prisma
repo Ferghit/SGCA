@@ -90,6 +90,7 @@ model Producto {
   updatedAt         DateTime @updatedAt
 
   detallesRequerimiento RequerimientoDetalle[]
+  ordenCompraDetalles   OrdenCompraDetalle[]
   inventario            Inventario[]
   recepcionDetalles     RecepcionDetalle[]
   devoluciones          Devolucion[]
@@ -276,6 +277,7 @@ model OrdenCompraDetalle {
   subtotal       Decimal @db.Decimal(10, 2)
 
   ordenCompra OrdenCompra @relation(fields: [ordenCompraId], references: [id], onDelete: Cascade)
+  producto    Producto?   @relation(fields: [productoId], references: [id])
 
   @@map("orden_compra_detalles")
 }

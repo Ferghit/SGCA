@@ -1,0 +1,420 @@
+'use client';
+
+import { useEffect, useMemo, useState } from 'react';
+import { useAuthStore } from '@/store/authStore';
+import { Card, StatCard } from '@/components/ui/Card';
+import { Producto } from '@/types';
+import api from '@/lib/api';
+import {
+  AlertCircle,
+  Package,
+  Pencil,
+  Plus,
+  Power,
+  Save,
+  Search,
+  Trash2,
+  X,
+} from 'lucide-react';
+
+type ProductoForm = {
+  codigo: string;
+  nombre: string;
+  descripcion: string;
+  unidadMedida: string;
+  categoria: string;
+  precioReferencial: string;
+  activo: boolean;
+};
+
+const EMPTY_FORM: ProductoForm = {
+  codigo: '',
+  nombre: '',
+  descripcion: '',
+  unidadMedida: '',
+  categoria: '',
+  precioReferencial: '',
+  activo: true,
+};
+
+const ROLES_GESTION = ['ADMIN', 'GERENTE', 'ANALISTA_COMPRAS', 'ENCARGADO_ALMACEN'];
+
+export default function ProductosPage() {
+  const user = useAuthStore((s) => s.user);
+  const [productos, setProductos] = useState<Producto[]>([]);
+  const [form, setForm] = useState<ProductoForm>(EMPTY_FORM);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [search, setSearch] = useState('');
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+
+  const canManage = ROLES_GESTION.includes(user?.rol || '');
+
+  const filtered = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    if (!term) return productos;
+    return productos.filter((producto) =>
+      [producto.codigo, producto.nombre, producto.categoria, producto.unidadMedida]
+        .filter(Boolean)
+        .some((value) => value!.toLowerCase().includes(term)),
+    );
+  }, [productos, search]);
+
+  const fetchProductos = async () => {
+    setIsLoading(true);
+    setError('');
+    try {
+      const { data } = await api.get<Producto[]>('/productos');
+      setProductos(data);
+    } catch (e: any) {
+      setError(e.response?.data?.message || 'No se pudo cargar el catalogo de productos.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchProductos();
+  }, []);
+
+  const resetForm = () => {
+    setForm(EMPTY_FORM);
+    setEditingId(null);
+  };
+
+  const handleChange = (field: keyof ProductoForm, value: string | boolean) => {
+    setForm((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const startEdit = (producto: Producto) => {
+    setEditingId(producto.id);
+    setForm({
+      codigo: producto.codigo,
+      nombre: producto.nombre,
+      descripcion: producto.descripcion || '',
+      unidadMedida: producto.unidadMedida,
+      categoria: producto.categoria,
+      precioReferencial:
+        producto.precioReferencial !== undefined && producto.precioReferencial !== null
+          ? String(producto.precioReferencial)
+          : '',
+      activo: producto.activo ?? true,
+    });
+    setError('');
+    setSuccess('');
+  };
+
+  const submitForm = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!canManage) return;
+
+    setIsSaving(true);
+    setError('');
+    setSuccess('');
+
+    const payload = {
+      codigo: form.codigo,
+      nombre: form.nombre,
+      descripcion: form.descripcion || undefined,
+      unidadMedida: form.unidadMedida,
+      categoria: form.categoria,
+      precioReferencial: form.precioReferencial ? Number(form.precioReferencial) : undefined,
+      activo: form.activo,
+    };
+
+    try {
+      if (editingId) {
+        await api.put(`/productos/${editingId}`, payload);
+        setSuccess('Producto actualizado correctamente.');
+      } else {
+        await api.post('/productos', payload);
+        setSuccess('Producto creado correctamente.');
+      }
+      resetForm();
+      await fetchProductos();
+    } catch (e: any) {
+      setError(e.response?.data?.message || 'No se pudo guardar el producto.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const toggleActivo = async (producto: Producto) => {
+    if (!canManage) return;
+
+    setError('');
+    setSuccess('');
+    try {
+      await api.put(`/productos/${producto.id}`, { activo: !(producto.activo ?? true) });
+      setSuccess(`Producto ${producto.activo ? 'desactivado' : 'activado'} correctamente.`);
+      await fetchProductos();
+    } catch (e: any) {
+      setError(e.response?.data?.message || 'No se pudo actualizar el estado del producto.');
+    }
+  };
+
+  const deleteProducto = async (producto: Producto) => {
+    if (!canManage) return;
+    const confirmed = window.confirm(`Eliminar el producto ${producto.codigo} - ${producto.nombre}?`);
+    if (!confirmed) return;
+
+    setError('');
+    setSuccess('');
+    try {
+      await api.delete(`/productos/${producto.id}`);
+      setSuccess('Producto eliminado correctamente.');
+      if (editingId === producto.id) resetForm();
+      await fetchProductos();
+    } catch (e: any) {
+      setError(e.response?.data?.message || 'No se pudo eliminar el producto.');
+    }
+  };
+
+  if (!canManage) {
+    return (
+      <div className="max-w-3xl mx-auto">
+        <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl text-amber-800">
+          No tienes permisos para administrar el catalogo de productos.
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between gap-4">
+        <div>
+          <h1 className="page-title">Productos</h1>
+          <p className="text-sm text-gray-500 mt-0.5">
+            Gestiona el catalogo central usado por requerimientos, inventario y compras.
+          </p>
+        </div>
+      </div>
+
+      {error && (
+        <div className="p-4 bg-red-50 border border-red-200 rounded-xl flex items-start gap-3">
+          <AlertCircle className="w-5 h-5 text-red-500 mt-0.5 flex-shrink-0" />
+          <p className="text-sm text-red-700">{error}</p>
+        </div>
+      )}
+      {success && (
+        <div className="p-4 bg-green-50 border border-green-200 rounded-xl text-sm text-green-700">
+          {success}
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <StatCard label="Total productos" value={productos.length} icon={Package} color="secondary" />
+        <StatCard
+          label="Activos"
+          value={productos.filter((producto) => producto.activo !== false).length}
+          icon={Package}
+          color="green"
+        />
+        <StatCard
+          label="Inactivos"
+          value={productos.filter((producto) => producto.activo === false).length}
+          icon={Package}
+          color="amber"
+        />
+      </div>
+
+      <div className="grid grid-cols-1 xl:grid-cols-[380px,1fr] gap-6">
+        <Card
+          title={editingId ? 'Editar producto' : 'Nuevo producto'}
+          action={
+            editingId ? (
+              <button
+                type="button"
+                onClick={resetForm}
+                className="text-sm text-gray-500 hover:text-gray-700 flex items-center gap-1"
+              >
+                <X className="w-4 h-4" />
+                Cancelar
+              </button>
+            ) : undefined
+          }
+        >
+          <form onSubmit={submitForm} className="space-y-4">
+            <div>
+              <label className="label-field">Codigo</label>
+              <input
+                value={form.codigo}
+                onChange={(e) => handleChange('codigo', e.target.value)}
+                className="input-field"
+                placeholder="PRD-011"
+                required
+              />
+            </div>
+            <div>
+              <label className="label-field">Nombre</label>
+              <input
+                value={form.nombre}
+                onChange={(e) => handleChange('nombre', e.target.value)}
+                className="input-field"
+                placeholder="Nombre del producto"
+                required
+              />
+            </div>
+            <div>
+              <label className="label-field">Categoria</label>
+              <input
+                value={form.categoria}
+                onChange={(e) => handleChange('categoria', e.target.value)}
+                className="input-field"
+                placeholder="Utiles de Oficina"
+                required
+              />
+            </div>
+            <div>
+              <label className="label-field">Unidad de medida</label>
+              <input
+                value={form.unidadMedida}
+                onChange={(e) => handleChange('unidadMedida', e.target.value)}
+                className="input-field"
+                placeholder="Unidad, Caja, Resma..."
+                required
+              />
+            </div>
+            <div>
+              <label className="label-field">Precio referencial</label>
+              <input
+                type="number"
+                min="0.01"
+                step="0.01"
+                value={form.precioReferencial}
+                onChange={(e) => handleChange('precioReferencial', e.target.value)}
+                className="input-field"
+                placeholder="0.00"
+              />
+            </div>
+            <div>
+              <label className="label-field">Descripcion</label>
+              <textarea
+                value={form.descripcion}
+                onChange={(e) => handleChange('descripcion', e.target.value)}
+                className="input-field resize-none"
+                rows={3}
+                placeholder="Detalles adicionales del producto"
+              />
+            </div>
+            <label className="flex items-center gap-2 text-sm text-gray-600">
+              <input
+                type="checkbox"
+                checked={form.activo}
+                onChange={(e) => handleChange('activo', e.target.checked)}
+              />
+              Producto activo
+            </label>
+            <button
+              type="submit"
+              disabled={isSaving}
+              className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-white font-medium disabled:opacity-60"
+              style={{ backgroundColor: '#006D77' }}
+            >
+              {editingId ? <Save className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
+              {isSaving ? 'Guardando...' : editingId ? 'Actualizar producto' : 'Crear producto'}
+            </button>
+          </form>
+        </Card>
+
+        <Card title="Catalogo de productos">
+          <div className="space-y-4">
+            <div className="relative">
+              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+              <input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="w-full pl-9 pr-4 py-2 border border-gray-200 rounded-lg text-sm"
+                placeholder="Buscar por codigo, nombre o categoria"
+              />
+            </div>
+
+            {isLoading ? (
+              <p className="text-sm text-gray-500">Cargando productos...</p>
+            ) : filtered.length === 0 ? (
+              <p className="text-sm text-gray-500">No se encontraron productos.</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-left text-gray-500 border-b border-gray-100">
+                      <th className="py-3 px-4 font-semibold">Codigo</th>
+                      <th className="py-3 px-4 font-semibold">Nombre</th>
+                      <th className="py-3 px-4 font-semibold">Categoria</th>
+                      <th className="py-3 px-4 font-semibold">Unidad</th>
+                      <th className="py-3 px-4 font-semibold">Precio</th>
+                      <th className="py-3 px-4 font-semibold">Estado</th>
+                      <th className="py-3 px-4 font-semibold text-right">Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filtered.map((producto) => (
+                      <tr key={producto.id} className="border-b border-gray-50 hover:bg-gray-50">
+                        <td className="py-3 px-4 font-mono text-xs">{producto.codigo}</td>
+                        <td className="py-3 px-4">
+                          <p className="font-medium text-primary-DEFAULT">{producto.nombre}</p>
+                          {producto.descripcion && (
+                            <p className="text-xs text-gray-400 mt-0.5">{producto.descripcion}</p>
+                          )}
+                        </td>
+                        <td className="py-3 px-4">{producto.categoria}</td>
+                        <td className="py-3 px-4">{producto.unidadMedida}</td>
+                        <td className="py-3 px-4">
+                          {producto.precioReferencial !== undefined && producto.precioReferencial !== null
+                            ? `S/ ${Number(producto.precioReferencial).toFixed(2)}`
+                            : '-'}
+                        </td>
+                        <td className="py-3 px-4">
+                          <span
+                            className={`px-2 py-1 rounded-full text-xs font-semibold ${
+                              producto.activo === false
+                                ? 'bg-gray-100 text-gray-600'
+                                : 'bg-green-50 text-green-700'
+                            }`}
+                          >
+                            {producto.activo === false ? 'Inactivo' : 'Activo'}
+                          </span>
+                        </td>
+                        <td className="py-3 px-4">
+                          <div className="flex items-center justify-end gap-2">
+                            <button
+                              type="button"
+                              onClick={() => startEdit(producto)}
+                              className="p-2 rounded-lg text-gray-600 hover:bg-gray-100"
+                              title="Editar"
+                            >
+                              <Pencil className="w-4 h-4" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => toggleActivo(producto)}
+                              className="p-2 rounded-lg text-amber-600 hover:bg-amber-50"
+                              title={producto.activo === false ? 'Activar' : 'Desactivar'}
+                            >
+                              <Power className="w-4 h-4" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => deleteProducto(producto)}
+                              className="p-2 rounded-lg text-red-600 hover:bg-red-50"
+                              title="Eliminar"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </Card>
+      </div>
+    </div>
+  );
+}

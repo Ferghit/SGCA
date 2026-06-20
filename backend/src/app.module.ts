@@ -7,6 +7,7 @@ import { RequerimientosModule } from './requerimientos/requerimientos.module';
 import { NotificacionesModule } from './notificaciones/notificaciones.module';
 import { CotizacionesModule } from './cotizaciones/cotizaciones.module';
 import { AlmacenModule } from './almacen/almacen.module';
+import { ProductosModule } from './productos/productos.module';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { AlmacenModule } from './almacen/almacen.module';
     NotificacionesModule,
     CotizacionesModule,
     AlmacenModule,
+    ProductosModule,
   ],
 })
 export class AppModule {}

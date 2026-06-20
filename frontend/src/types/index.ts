@@ -35,6 +35,9 @@ export interface Producto {
   unidadMedida: string;
   categoria: string;
   precioReferencial?: number;
+  activo?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface RequerimientoDetalle {

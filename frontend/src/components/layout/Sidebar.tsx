@@ -28,6 +28,7 @@ const MENU_BY_ROL: Record<Rol, MenuItem[]> = {
   ADMIN: [
     { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
     { label: 'Usuarios', href: '/usuarios', icon: Users },
+    { label: 'Productos', href: '/productos', icon: Package },
     { label: 'Requerimientos', href: '/requerimientos', icon: ClipboardList },
     { label: 'Recepciones', href: '/recepciones', icon: Package },
     { label: 'Inventario', href: '/inventario', icon: Package },
@@ -47,6 +48,7 @@ const MENU_BY_ROL: Record<Rol, MenuItem[]> = {
   ],
   ANALISTA_COMPRAS: [
     { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
+    { label: 'Productos', href: '/productos', icon: Package },
     { label: 'Requerimientos', href: '/requerimientos', icon: ClipboardList },
     { label: 'Solicitudes de Cotización', href: '/cotizaciones', icon: FileText },
     { label: 'Ordenes de Compra', href: '/ordenes-compra', icon: ShoppingCart },
@@ -54,6 +56,7 @@ const MENU_BY_ROL: Record<Rol, MenuItem[]> = {
   ],
   GERENTE: [
     { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
+    { label: 'Productos', href: '/productos', icon: Package },
     { label: 'Requerimientos', href: '/requerimientos', icon: ClipboardList },
     { label: 'Recepciones', href: '/recepciones', icon: Package },
     { label: 'Inventario', href: '/inventario', icon: Package },
@@ -69,6 +72,7 @@ const MENU_BY_ROL: Record<Rol, MenuItem[]> = {
   ],
   ENCARGADO_ALMACEN: [
     { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
+    { label: 'Productos', href: '/productos', icon: Package },
     { label: 'Recepciones', href: '/recepciones', icon: Package },
     { label: 'Inventario', href: '/inventario', icon: Package },
     { label: 'Devoluciones', href: '/devoluciones', icon: Package },

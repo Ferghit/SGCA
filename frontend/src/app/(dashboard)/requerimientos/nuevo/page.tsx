@@ -27,6 +27,7 @@ export default function NuevoRequerimientoPage() {
   const { create, isLoading } = useRequerimientosStore();
 
   const [productos, setProductos] = useState<Producto[]>([]);
+  const [isLoadingProductos, setIsLoadingProductos] = useState(true);
   const [prioridad, setPrioridad] = useState<Prioridad>('MEDIA');
   const [fechaRequerida, setFechaRequerida] = useState('');
   const [descripcion, setDescripcion] = useState('');
@@ -37,26 +38,14 @@ export default function NuevoRequerimientoPage() {
   const [success, setSuccess] = useState('');
 
   useEffect(() => {
-    api.get('/users/por-rol?rol=TRABAJADOR').catch(() => {});
-    // Cargamos los productos del backend (tabla productos)
     const fetchProductos = async () => {
       try {
-        // Como no hay endpoint de productos aun, simulamos con datos del seed
-        const mockProductos: Producto[] = [
-          { id: 1, codigo: 'PRD-001', nombre: 'Papel Bond A4 (resma 500 hojas)', unidadMedida: 'Resma', categoria: 'Utiles de Oficina' },
-          { id: 2, codigo: 'PRD-002', nombre: 'Lapicero Azul BIC', unidadMedida: 'Unidad', categoria: 'Utiles de Oficina' },
-          { id: 3, codigo: 'PRD-003', nombre: 'Cartucho de Tinta HP Negro', unidadMedida: 'Unidad', categoria: 'Insumos de Impresion' },
-          { id: 4, codigo: 'PRD-004', nombre: 'Folder Manila A4', unidadMedida: 'Paquete x25', categoria: 'Utiles de Oficina' },
-          { id: 5, codigo: 'PRD-005', nombre: 'Engrapador Estandar', unidadMedida: 'Unidad', categoria: 'Utiles de Oficina' },
-          { id: 6, codigo: 'PRD-006', nombre: 'Disco Duro Externo 1TB', unidadMedida: 'Unidad', categoria: 'Equipos de Computo' },
-          { id: 7, codigo: 'PRD-007', nombre: 'Teclado USB Estandar', unidadMedida: 'Unidad', categoria: 'Equipos de Computo' },
-          { id: 8, codigo: 'PRD-008', nombre: 'Desinfectante en Spray 500ml', unidadMedida: 'Frasco', categoria: 'Limpieza e Higiene' },
-          { id: 9, codigo: 'PRD-009', nombre: 'Silla Ergonomica de Oficina', unidadMedida: 'Unidad', categoria: 'Mobiliario' },
-          { id: 10, codigo: 'PRD-010', nombre: 'Monitor LED 24 pulgadas', unidadMedida: 'Unidad', categoria: 'Equipos de Computo' },
-        ];
-        setProductos(mockProductos);
+        const { data } = await api.get<Producto[]>('/productos?soloActivos=true');
+        setProductos(data);
       } catch {
-        // silencioso
+        setError('No se pudo cargar el catalogo de productos. Intenta nuevamente.');
+      } finally {
+        setIsLoadingProductos(false);
       }
     };
     fetchProductos();
@@ -92,6 +81,9 @@ export default function NuevoRequerimientoPage() {
     setSuccess('');
 
     if (!fechaRequerida) return setError('La fecha requerida es obligatoria.');
+    if (productos.length === 0) {
+      return setError('No hay productos activos disponibles para generar el requerimiento.');
+    }
     if (detalles.some((d) => !d.productoId || !d.unidadMedida || d.cantidad <= 0)) {
       return setError('Completa todos los campos de los productos (producto, cantidad y unidad de medida).');
     }
@@ -216,6 +208,14 @@ export default function NuevoRequerimientoPage() {
             </button>
           </div>
 
+          {isLoadingProductos ? (
+            <p className="text-sm text-gray-500">Cargando catalogo de productos...</p>
+          ) : productos.length === 0 ? (
+            <div className="p-3 rounded-lg bg-amber-50 border border-amber-200 text-sm text-amber-700">
+              No hay productos activos registrados. Solicita a un administrador que cree el catalogo.
+            </div>
+          ) : null}
+
           <div className="space-y-3">
             {detalles.map((det, index) => (
               <div key={index} className="p-4 bg-gray-50 rounded-lg border border-gray-200 space-y-3">
@@ -300,7 +300,7 @@ export default function NuevoRequerimientoPage() {
           </Link>
           <button
             type="submit"
-            disabled={isLoading}
+            disabled={isLoading || isLoadingProductos || productos.length === 0}
             className="px-6 py-2.5 rounded-lg text-white font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             style={{ backgroundColor: isLoading ? '#ccc' : '#006D77' }}
           >
