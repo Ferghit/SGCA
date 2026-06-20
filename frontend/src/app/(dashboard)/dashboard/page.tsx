@@ -45,12 +45,13 @@ export default function DashboardPage() {
   const isTrabajador = user?.rol === 'TRABAJADOR';
   const isJefe = user?.rol === 'JEFE_AREA' || user?.rol === 'ADMIN' || user?.rol === 'GERENTE';
   const isAlmacen = user?.rol === 'ENCARGADO_ALMACEN';
+  const canViewInventory = isAlmacen || user?.rol === 'ADMIN' || user?.rol === 'GERENTE';
 
   useEffect(() => {
     fetchAll();
     if (isTrabajador) fetchEstadisticasTrabajador();
     if (isJefe) fetchEstadisticasJefe();
-    if (isAlmacen) {
+    if (canViewInventory) {
       fetchInventario();
       fetchMovimientos();
       fetchRecepciones();
@@ -201,8 +202,8 @@ export default function DashboardPage() {
         )}
       </div>
 
-      {/* Inventory Section - Only for ENCARGADO_ALMACEN */}
-      {isAlmacen && (
+      {/* Inventory Section */}
+      {canViewInventory && (
         <>
           <div className="flex items-center justify-between px-1">
             <h2 className="text-xl font-bold text-primary-DEFAULT">Inventario</h2>

@@ -29,6 +29,9 @@ const MENU_BY_ROL: Record<Rol, MenuItem[]> = {
     { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
     { label: 'Usuarios', href: '/usuarios', icon: Users },
     { label: 'Requerimientos', href: '/requerimientos', icon: ClipboardList },
+    { label: 'Recepciones', href: '/recepciones', icon: Package },
+    { label: 'Inventario', href: '/inventario', icon: Package },
+    { label: 'Devoluciones', href: '/devoluciones', icon: Package },
     { label: 'Notificaciones', href: '/notificaciones', icon: Bell },
   ],
   TRABAJADOR: [
@@ -52,6 +55,9 @@ const MENU_BY_ROL: Record<Rol, MenuItem[]> = {
   GERENTE: [
     { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
     { label: 'Requerimientos', href: '/requerimientos', icon: ClipboardList },
+    { label: 'Recepciones', href: '/recepciones', icon: Package },
+    { label: 'Inventario', href: '/inventario', icon: Package },
+    { label: 'Devoluciones', href: '/devoluciones', icon: Package },
     { label: 'Reportes', href: '/reportes', icon: BarChart3 },
     { label: 'Notificaciones', href: '/notificaciones', icon: Bell },
   ],
