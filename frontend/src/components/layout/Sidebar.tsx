@@ -65,6 +65,7 @@ const MENU_BY_ROL: Record<Rol, MenuItem[]> = {
     { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
     { label: 'Recepciones', href: '/recepciones', icon: Package },
     { label: 'Inventario', href: '/inventario', icon: Package },
+    { label: 'Devoluciones', href: '/devoluciones', icon: Package },
     { label: 'Notificaciones', href: '/notificaciones', icon: Bell },
   ],
   CONTADOR: [

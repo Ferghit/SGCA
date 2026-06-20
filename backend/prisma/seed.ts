@@ -262,6 +262,25 @@ async function main() {
 
   console.log(`Requerimientos creados: 5`);
 
+  const ordenPrueba = await prisma.ordenCompra.upsert({
+    where: { numero: 'OC-2026-001' },
+    update: {},
+    create: {
+      numero: 'OC-2026-001',
+      proveedorId: proveedor.id,
+      estado: 'APROBADA',
+      montoTotal: 450.0,
+      fechaEntregaEsperada: new Date(),
+      detalles: {
+        create: [
+          { productoId: productos[0].id, descripcion: productos[0].nombre, cantidad: 10, precioUnitario: 20, subtotal: 200 },
+          { productoId: productos[1].id, descripcion: productos[1].nombre, cantidad: 25, precioUnitario: 10, subtotal: 250 },
+        ],
+      },
+    },
+  });
+  console.log(`Orden de compra de prueba creada: ${ordenPrueba.numero}`);
+
   // ─── NOTIFICACIONES ──────────────────────────────────────────────────────────
   await prisma.notificacion.createMany({
     data: [
