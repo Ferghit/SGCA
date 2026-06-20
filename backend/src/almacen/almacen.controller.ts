@@ -8,7 +8,7 @@ import { Roles } from '../common/decorators/roles.decorator';
 import { Rol } from '@prisma/client'; 
  
 @UseGuards(JwtAuthGuard, RolesGuard) 
-@Roles(Rol.ENCARGADO_ALMACEN, Rol.ADMIN) 
+@Roles(Rol.ENCARGADO_ALMACEN, Rol.ADMIN, Rol.GERENTE) 
 @Controller('almacen') 
 export class AlmacenController { 
   constructor(private service: AlmacenService) {} 
