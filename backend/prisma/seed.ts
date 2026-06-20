@@ -1,4 +1,4 @@
-import { PrismaClient, Rol, EstadoRequerimiento, Prioridad } from '@prisma/client';
+import { PrismaClient, Rol, EstadoRequerimiento, Prioridad, EstadoOrdenCompra, EstadoItemRecepcion } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 
 const prisma = new PrismaClient();
@@ -262,13 +262,15 @@ async function main() {
 
   console.log(`Requerimientos creados: 5`);
 
-  const ordenPrueba = await prisma.ordenCompra.upsert({
+  const almacenUser = usuarios.find(u => u.rol === Rol.ENCARGADO_ALMACEN)!;
+  
+  const orden1 = await prisma.ordenCompra.upsert({
     where: { numero: 'OC-2026-001' },
     update: {},
     create: {
       numero: 'OC-2026-001',
       proveedorId: proveedor.id,
-      estado: 'APROBADA',
+      estado: EstadoOrdenCompra.RECIBIDA_PARCIAL,
       montoTotal: 450.0,
       fechaEntregaEsperada: new Date(),
       detalles: {
@@ -279,7 +281,145 @@ async function main() {
       },
     },
   });
-  console.log(`Orden de compra de prueba creada: ${ordenPrueba.numero}`);
+  
+  const orden2 = await prisma.ordenCompra.upsert({
+    where: { numero: 'OC-2026-002' },
+    update: {},
+    create: {
+      numero: 'OC-2026-002',
+      proveedorId: proveedor.id,
+      estado: EstadoOrdenCompra.ENVIADA,
+      montoTotal: 1330.0,
+      fechaEntregaEsperada: new Date(),
+      detalles: {
+        create: [
+          { productoId: productos[2].id, descripcion: productos[2].nombre, cantidad: 5, precioUnitario: 45, subtotal: 225 },
+          { productoId: productos[5].id, descripcion: productos[5].nombre, cantidad: 2, precioUnitario: 280, subtotal: 560 },
+          { productoId: productos[6].id, descripcion: productos[6].nombre, cantidad: 5, precioUnitario: 65, subtotal: 325 },
+          { productoId: productos[9].id, descripcion: productos[9].nombre, cantidad: 1, precioUnitario: 850, subtotal: 850 },
+        ],
+      },
+    },
+  });
+
+  const orden3 = await prisma.ordenCompra.upsert({
+    where: { numero: 'OC-2026-003' },
+    update: {},
+    create: {
+      numero: 'OC-2026-003',
+      proveedorId: proveedor.id,
+      estado: EstadoOrdenCompra.RECIBIDA_COMPLETA,
+      montoTotal: 220.0,
+      fechaEntregaEsperada: new Date(),
+      detalles: {
+        create: [
+          { productoId: productos[3].id, descripcion: productos[3].nombre, cantidad: 20, precioUnitario: 8, subtotal: 160 },
+          { productoId: productos[4].id, descripcion: productos[4].nombre, cantidad: 1, precioUnitario: 22, subtotal: 22 },
+        ],
+      },
+    },
+  });
+
+  console.log(`Ordenes de compra creadas: 3`);
+
+  // ─── RECEPCIONES ────────────────────────────────────────────────────────────
+  const recepcion1 = await prisma.recepcion.upsert({
+    where: { id: 1 },
+    update: {},
+    create: {
+      ordenCompraId: orden1.id,
+      fechaRecepcion: new Date(),
+      responsableId: almacenUser.id,
+      observaciones: 'Primera entrega de la orden OC-2026-001',
+      detalles: {
+        create: [
+          {
+            productoId: productos[0].id,
+            descripcion: productos[0].nombre,
+            cantidadEsperada: 10,
+            cantidadRecibida: 8,
+            estado: EstadoItemRecepcion.CONFORME,
+            observacion: 'Faltan 2 resmas'
+          },
+          {
+            productoId: productos[1].id,
+            descripcion: productos[1].nombre,
+            cantidadEsperada: 25,
+            cantidadRecibida: 25,
+            estado: EstadoItemRecepcion.CONFORME,
+          }
+        ]
+      }
+    }
+  });
+
+  const recepcion2 = await prisma.recepcion.upsert({
+    where: { id: 2 },
+    update: {},
+    create: {
+      ordenCompraId: orden3.id,
+      fechaRecepcion: new Date(),
+      responsableId: almacenUser.id,
+      observaciones: 'Entrega completa OC-2026-003',
+      detalles: {
+        create: [
+          {
+            productoId: productos[3].id,
+            descripcion: productos[3].nombre,
+            cantidadEsperada: 20,
+            cantidadRecibida: 20,
+            estado: EstadoItemRecepcion.CONFORME,
+          },
+          {
+            productoId: productos[4].id,
+            descripcion: productos[4].nombre,
+            cantidadEsperada: 1,
+            cantidadRecibida: 1,
+            estado: EstadoItemRecepcion.DANADO,
+            observacion: 'Engrapador dañado'
+          }
+        ]
+      }
+    }
+  });
+  
+  console.log(`Recepciones creadas: 2`);
+
+  // ─── INVENTARIO ──────────────────────────────────────────────────────────────
+  await prisma.inventario.upsert({
+    where: { productoId: productos[0].id },
+    update: { cantidad: 8, stockMinimo: 5 },
+    create: { productoId: productos[0].id, cantidad: 8, stockMinimo: 5 },
+  });
+  await prisma.inventario.upsert({
+    where: { productoId: productos[1].id },
+    update: { cantidad: 25, stockMinimo: 10 },
+    create: { productoId: productos[1].id, cantidad: 25, stockMinimo: 10 },
+  });
+  await prisma.inventario.upsert({
+    where: { productoId: productos[3].id },
+    update: { cantidad: 20, stockMinimo: 5 },
+    create: { productoId: productos[3].id, cantidad: 20, stockMinimo: 5 },
+  });
+
+  console.log(`Inventario actualizado para 3 productos`);
+
+  // ─── DEVOLUCIONES ────────────────────────────────────────────────────────────
+  const devolucion1 = await prisma.devolucion.upsert({
+    where: { id: 1 },
+    update: {},
+    create: {
+      recepcionId: recepcion2.id,
+      productoId: productos[4].id,
+      descripcion: productos[4].nombre,
+      cantidad: 1,
+      motivo: 'Engrapador dañado en entrega',
+      notificada: true,
+      createdAt: new Date()
+    }
+  });
+  
+  console.log(`Devolucion creada: 1`);
 
   // ─── NOTIFICACIONES ──────────────────────────────────────────────────────────
   await prisma.notificacion.createMany({

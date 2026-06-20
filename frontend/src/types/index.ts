@@ -205,6 +205,12 @@ export interface MovimientoInventario {
 }
 
 export interface Devolucion {
-  id: number; recepcionId: number; descripcion: string; cantidad: number; motivo: string;
-  notificada: boolean; createdAt: string;
+  id: number; 
+  recepcionId: number; 
+  descripcion: string; 
+  cantidad: number; 
+  motivo: string;
+  notificada: boolean; 
+  createdAt: string;
+  recepcion?: Recepcion;
 }
