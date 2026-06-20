@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useAlmacenStore } from '@/store/almacenStore';
 import { Card } from '@/components/ui/Card';
 import { Recepcion, RecepcionDetalle } from '@/types';
+import { Package, Truck, AlertTriangle, Send } from 'lucide-react';
 
 export default function DevolucionesPage() {
   const { 
@@ -21,10 +22,10 @@ export default function DevolucionesPage() {
   
   const [form, setForm] = useState({ 
     recepcionId: '', 
+    productoId: '', 
     descripcion: '', 
     cantidad: '', 
-    motivo: '',
-    productoId: ''
+    motivo: '' 
   });
   
   const [selectedRecepcion, setSelectedRecepcion] = useState<Recepcion | null>(null);
@@ -95,15 +96,22 @@ export default function DevolucionesPage() {
       )}
 
       <Card title="Registrar devolución">
-        <div className="space-y-4">
+        <div className="space-y-6">
           {/* Select Recepcion */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Recepción</label>
+          <div className="space-y-2">
+            <label className="flex items-center gap-2 text-sm font-semibold text-gray-800">
+              <Truck className="w-4 h-4 text-secondary-DEFAULT" style={{ color: '#006D77' }} />
+              Recepción
+            </label>
             {isLoadingRecepciones ? (
-              <p className="text-sm text-gray-400">Cargando recepciones...</p>
+              <div className="flex items-center gap-2 text-sm text-gray-400">
+                <div className="w-4 h-4 border-2 border-secondary-DEFAULT border-t-transparent rounded-full animate-spin" style={{ borderColor: '#006D77', borderTopColor: 'transparent' }}></div>
+                Cargando recepciones...
+              </div>
             ) : (
               <select
-                className="w-full border rounded-lg px-2 py-1.5 text-sm"
+                className="w-full border-2 border-gray-100 rounded-lg px-4 py-3 text-sm focus:border-secondary-DEFAULT focus:ring-2 focus:ring-secondary-50 outline-none transition-all"
+                style={{ '--tw-ring-color': '#006D77', '--tw-border-opacity': '1', borderColor: form.recepcionId ? '#006D77' : undefined } as React.CSSProperties}
                 value={form.recepcionId}
                 onChange={(e) => setForm({ ...form, recepcionId: e.target.value })}
               >
@@ -117,51 +125,70 @@ export default function DevolucionesPage() {
             )}
           </div>
 
-          {/* Show selected recepcion's detalles to auto-fill */}
-          {selectedRecepcion && (
-            <div className="border border-gray-100 rounded-lg p-3">
-              <p className="text-sm font-medium text-gray-600 mb-2">Productos de la recepción:</p>
-              <div className="space-y-1">
-                {selectedRecepcion.detalles.map((det) => (
-                  <button
-                    key={det.id}
-                    onClick={() => selectDetalle(det)}
-                    className="w-full text-left text-sm p-2 rounded-md hover:bg-gray-50 border border-gray-100"
-                  >
-                    {det.descripcion} (Recibido: {det.cantidadRecibida})
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Producto / descripción</label>
-              <input
-                className="w-full border rounded-lg px-2 py-1.5 text-sm"
-                placeholder="Producto / descripción"
-                value={form.descripcion}
-                onChange={(e) => setForm({ ...form, descripcion: e.target.value })}
-              />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            {/* Select Producto */}
+            <div className="space-y-2">
+              <label className="flex items-center gap-2 text-sm font-semibold text-gray-800">
+                <Package className="w-4 h-4 text-secondary-DEFAULT" style={{ color: '#006D77' }} />
+                Producto / Descripción
+              </label>
+              {selectedRecepcion ? (
+                <select
+                  className="w-full border-2 border-gray-100 rounded-lg px-4 py-3 text-sm focus:border-secondary-DEFAULT focus:ring-2 focus:ring-secondary-50 outline-none transition-all"
+                  style={{ '--tw-ring-color': '#006D77', '--tw-border-opacity': '1', borderColor: form.descripcion ? '#006D77' : undefined } as React.CSSProperties}
+                  value={form.descripcion}
+                  onChange={(e) => {
+                    const detalle = selectedRecepcion.detalles.find(d => d.descripcion === e.target.value);
+                    if (detalle) {
+                      selectDetalle(detalle);
+                    } else {
+                      setForm({ ...form, descripcion: e.target.value });
+                    }
+                  }}
+                >
+                  <option value="">Selecciona producto</option>
+                  {selectedRecepcion.detalles.map((det) => (
+                    <option key={det.id} value={det.descripcion}>
+                      {det.producto ? `${det.producto.nombre} (${det.producto.codigo}) — Recibido: ${det.cantidadRecibida}` : `${det.descripcion} (Recibido: ${det.cantidadRecibida})`}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <input
+                  className="w-full border-2 border-gray-100 rounded-lg px-4 py-3 text-sm focus:border-secondary-DEFAULT focus:ring-2 focus:ring-secondary-50 outline-none transition-all"
+                  placeholder="Ingresa descripción del producto"
+                  value={form.descripcion}
+                  onChange={(e) => setForm({ ...form, descripcion: e.target.value })}
+                />
+              )}
             </div>
             
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Cantidad</label>
+            {/* Cantidad */}
+            <div className="space-y-2">
+              <label className="flex items-center gap-2 text-sm font-semibold text-gray-800">
+                <AlertTriangle className="w-4 h-4 text-secondary-DEFAULT" style={{ color: '#006D77' }} />
+                Cantidad
+              </label>
               <input
-                className="w-full border rounded-lg px-2 py-1.5 text-sm"
+                className="w-full border-2 border-gray-100 rounded-lg px-4 py-3 text-sm focus:border-secondary-DEFAULT focus:ring-2 focus:ring-secondary-50 outline-none transition-all"
+                style={{ '--tw-ring-color': '#006D77', '--tw-border-opacity': '1', borderColor: form.cantidad ? '#006D77' : undefined } as React.CSSProperties}
                 type="number"
-                placeholder="Cantidad"
+                placeholder="0"
                 value={form.cantidad}
                 onChange={(e) => setForm({ ...form, cantidad: e.target.value })}
               />
             </div>
 
-            <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-1">Motivo</label>
-              <input
-                className="w-full border rounded-lg px-2 py-1.5 text-sm"
-                placeholder="Motivo (ej: producto dañado)"
+            {/* Motivo */}
+            <div className="md:col-span-2 space-y-2">
+              <label className="flex items-center gap-2 text-sm font-semibold text-gray-800">
+                <AlertTriangle className="w-4 h-4 text-secondary-DEFAULT" style={{ color: '#006D77' }} />
+                Motivo de la devolución
+              </label>
+              <textarea
+                className="w-full border-2 border-gray-100 rounded-lg px-4 py-3 text-sm focus:border-secondary-DEFAULT focus:ring-2 focus:ring-secondary-50 outline-none transition-all resize-y min-h-[100px]"
+                style={{ '--tw-ring-color': '#006D77', '--tw-border-opacity': '1', borderColor: form.motivo ? '#006D77' : undefined } as React.CSSProperties}
+                placeholder="Describe el motivo (ej: producto dañado, incorrecto, etc.)"
                 value={form.motivo}
                 onChange={(e) => setForm({ ...form, motivo: e.target.value })}
               />
@@ -172,9 +199,10 @@ export default function DevolucionesPage() {
         <button
           onClick={enviar}
           disabled={isLoading}
-          className="mt-4 px-4 py-2 rounded-lg text-white text-sm font-medium disabled:opacity-50"
+          className="mt-6 w-full md:w-auto flex items-center justify-center gap-2 px-6 py-3 rounded-lg text-white text-sm font-semibold disabled:opacity-50 transition-all hover:opacity-90 shadow-sm"
           style={{ backgroundColor: '#006D77' }}
         >
+          <Send className="w-4 h-4" />
           {isLoading ? 'Registrando...' : 'Registrar y notificar proveedor'}
         </button>
       </Card>

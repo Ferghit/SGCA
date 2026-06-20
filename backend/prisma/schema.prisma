@@ -91,6 +91,8 @@ model Producto {
 
   detallesRequerimiento RequerimientoDetalle[]
   inventario            Inventario[]
+  recepcionDetalles     RecepcionDetalle[]
+  devoluciones          Devolucion[]
 
   @@map("productos")
 }
@@ -306,6 +308,7 @@ model RecepcionDetalle {
   observacion      String?
 
   recepcion Recepcion @relation(fields: [recepcionId], references: [id], onDelete: Cascade)
+  producto  Producto?  @relation(fields: [productoId], references: [id])
 
   @@map("recepcion_detalles")
 }
@@ -415,6 +418,7 @@ model Devolucion {
   createdAt   DateTime @default(now())
 
   recepcion Recepcion @relation(fields: [recepcionId], references: [id])
+  producto  Producto? @relation(fields: [productoId], references: [id])
 
   @@map("devoluciones")
 }

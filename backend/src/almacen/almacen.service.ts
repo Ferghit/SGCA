@@ -89,15 +89,22 @@ export class AlmacenService {
  
   getRecepciones() { 
     return this.prisma.recepcion.findMany({ 
-      include: { ordenCompra: { include: { proveedor: true } }, detalles: true }, 
+      include: { 
+        ordenCompra: { include: { proveedor: true } }, 
+        detalles: { include: { producto: true } } 
+      }, 
       orderBy: { fechaRecepcion: 'desc' }, 
     }); 
   } 
- 
+
   async getRecepcion(id: number) { 
     const rec = await this.prisma.recepcion.findUnique({ 
       where: { id }, 
-      include: { ordenCompra: { include: { proveedor: true } }, detalles: true, guias: true }, 
+      include: { 
+        ordenCompra: { include: { proveedor: true } }, 
+        detalles: { include: { producto: true } }, 
+        guias: true 
+      }, 
     }); 
     if (!rec) throw new NotFoundException('Recepción no encontrada'); 
     return rec; 

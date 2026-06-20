@@ -188,6 +188,7 @@ export interface RecepcionDetalle {
   id: number; productoId?: number; descripcion: string;
   cantidadEsperada: number; cantidadRecibida: number;
   estado: EstadoItemRecepcion; observacion?: string;
+  producto?: Producto;
 }
 
 export interface Recepcion {
