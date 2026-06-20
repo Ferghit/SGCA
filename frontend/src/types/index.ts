@@ -167,3 +167,51 @@ export interface SolicitudCotizacion {
   ofertas: OfertaProveedor[];
   proveedorGanador?: { id: number; razonSocial: string };
 }
+
+export type EstadoOrdenCompra = 'BORRADOR' | 'APROBADA' | 'ENVIADA' | 'RECIBIDA_PARCIAL' | 'RECIBIDA_COMPLETA' | 'CANCELADA';
+export type EstadoItemRecepcion = 'CONFORME' | 'DANADO' | 'FALTANTE';
+
+export interface Proveedor { id: number; ruc: string; razonSocial: string; email?: string; }
+
+export interface OrdenCompraDetalle {
+  id: number; productoId?: number; descripcion: string;
+  cantidad: number; precioUnitario: number; subtotal: number;
+}
+
+export interface OrdenCompra {
+  id: number; numero: string; estado: EstadoOrdenCompra; montoTotal: number;
+  fechaEmision: string; fechaEntregaEsperada?: string;
+  proveedor: Proveedor; detalles: OrdenCompraDetalle[];
+}
+
+export interface RecepcionDetalle {
+  id: number; productoId?: number; descripcion: string;
+  cantidadEsperada: number; cantidadRecibida: number;
+  estado: EstadoItemRecepcion; observacion?: string;
+  producto?: Producto;
+}
+
+export interface Recepcion {
+  id: number; ordenCompraId: number; fechaRecepcion: string; observaciones?: string;
+  ordenCompra: OrdenCompra; detalles: RecepcionDetalle[]; guias?: { id: number; numero: string }[];
+}
+
+export interface InventarioItem {
+  id: number; productoId: number; cantidad: number; stockMinimo: number;
+  stockBajo: boolean; ubicacion?: string; producto: Producto;
+}
+
+export interface MovimientoInventario {
+  tipo: 'ENTRADA' | 'SALIDA'; producto: string; cantidad: number; fecha: string; referencia: string;
+}
+
+export interface Devolucion {
+  id: number; 
+  recepcionId: number; 
+  descripcion: string; 
+  cantidad: number; 
+  motivo: string;
+  notificada: boolean; 
+  createdAt: string;
+  recepcion?: Recepcion;
+}

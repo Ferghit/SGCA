@@ -6,6 +6,7 @@ import { UsersModule } from './users/users.module';
 import { RequerimientosModule } from './requerimientos/requerimientos.module';
 import { NotificacionesModule } from './notificaciones/notificaciones.module';
 import { CotizacionesModule } from './cotizaciones/cotizaciones.module';
+import { AlmacenModule } from './almacen/almacen.module';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { CotizacionesModule } from './cotizaciones/cotizaciones.module';
     RequerimientosModule,
     NotificacionesModule,
     CotizacionesModule,
+    AlmacenModule,
   ],
 })
 export class AppModule {}

@@ -3,7 +3,8 @@
 import { useEffect } from 'react';
 import { useAuthStore } from '@/store/authStore';
 import { useRequerimientosStore } from '@/store/requerimientosStore';
-import { StatCard } from '@/components/ui/Card';
+import { useAlmacenStore } from '@/store/almacenStore';
+import { Card, StatCard } from '@/components/ui/Card';
 import { EstadoBadge, PrioridadBadge } from '@/components/ui/Badge';
 import { ROL_LABELS, formatDateShort } from '@/lib/utils';
 import Link from 'next/link';
@@ -16,7 +17,10 @@ import {
   Plus,
   ArrowRight,
   FileEdit,
+  Package,
+  ArrowUpDown,
 } from 'lucide-react';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 
 export default function DashboardPage() {
   const user = useAuthStore((s) => s.user);
@@ -29,17 +33,41 @@ export default function DashboardPage() {
     fetchEstadisticasJefe,
     isLoading,
   } = useRequerimientosStore();
+  const {
+    inventario,
+    movimientos,
+    fetchInventario,
+    fetchMovimientos,
+    fetchRecepciones,
+    fetchOrdenesPendientes,
+  } = useAlmacenStore();
 
   const isTrabajador = user?.rol === 'TRABAJADOR';
   const isJefe = user?.rol === 'JEFE_AREA' || user?.rol === 'ADMIN' || user?.rol === 'GERENTE';
+  const isAlmacen = user?.rol === 'ENCARGADO_ALMACEN';
 
   useEffect(() => {
     fetchAll();
     if (isTrabajador) fetchEstadisticasTrabajador();
     if (isJefe) fetchEstadisticasJefe();
+    if (isAlmacen) {
+      fetchInventario();
+      fetchMovimientos();
+      fetchRecepciones();
+      fetchOrdenesPendientes();
+    }
   }, []);
 
   const recentReqs = requerimientos.slice(0, 5);
+
+  // Prepare chart data for inventory
+  const chartData = inventario.map(item => ({
+    name: item.producto.nombre.length > 20 ? item.producto.nombre.substring(0, 20) + '...' : item.producto.nombre,
+    cantidad: Number(item.cantidad),
+    stockMinimo: Number(item.stockMinimo)
+  }));
+
+  const COLORS = ['#006D77', '#FF6B6B', '#4ECDC4', '#FFE66D', '#1A535C'];
 
   return (
     <div className="space-y-6">
@@ -172,6 +200,116 @@ export default function DashboardPage() {
           </div>
         )}
       </div>
+
+      {/* Inventory Section - Only for ENCARGADO_ALMACEN */}
+      {isAlmacen && (
+        <>
+          <div className="flex items-center justify-between px-1">
+            <h2 className="text-xl font-bold text-primary-DEFAULT">Inventario</h2>
+            <Link
+              href="/inventario"
+              className="flex items-center gap-1 text-sm font-medium text-secondary-DEFAULT hover:text-secondary-700 transition-colors"
+              style={{ color: '#006D77' }}
+            >
+              Ver detalles
+              <ArrowRight className="w-4 h-4" />
+            </Link>
+          </div>
+
+          {/* Inventory Stats */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <StatCard label="Productos en stock" value={inventario.length} icon={Package} color="secondary" />
+            <StatCard 
+              label="Alertas de stock bajo" 
+              value={inventario.filter(i => i.stockBajo).length} 
+              icon={AlertTriangle} 
+              color="red" 
+            />
+            <StatCard label="Movimientos recientes" value={movimientos.length} icon={ArrowUpDown} color="blue" />
+          </div>
+
+          {/* Stock Chart & Table */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <Card title="Stock actual por producto">
+              {inventario.length === 0 ? (
+                <p className="text-sm text-gray-400">No hay productos en inventario</p>
+              ) : (
+                <div className="h-80">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                      <XAxis dataKey="name" tick={{ fontSize: 12 }} />
+                      <YAxis />
+                      <Tooltip 
+                        contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} 
+                      />
+                      <Bar dataKey="cantidad" name="Cantidad actual" radius={[4, 4, 0, 0]}>
+                        {chartData.map((entry, index) => (
+                          <Cell 
+                            key={`cell-${index}`} 
+                            fill={entry.cantidad < entry.stockMinimo ? '#FF6B6B' : COLORS[index % COLORS.length]} 
+                          />
+                        ))}
+                      </Bar>
+                      <Bar dataKey="stockMinimo" name="Stock mínimo" fill="#E0E0E0" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
+            </Card>
+
+            <Card title="Historial de movimientos">
+              {movimientos.length === 0 ? (
+                <p className="text-sm text-gray-400">Sin movimientos aún</p>
+              ) : (
+                <div className="space-y-2 max-h-80 overflow-y-auto">
+                  {movimientos.slice(0, 10).map((m, idx) => (
+                    <div 
+                      key={idx} 
+                      className="flex justify-between text-sm border-b border-gray-50 pb-2 last:border-0"
+                    >
+                      <span>{m.producto} — <span className="text-gray-400">{m.referencia}</span></span>
+                      <span 
+                        className={m.tipo === 'ENTRADA' ? 'text-green-600 font-medium' : 'text-red-600 font-medium'}
+                      >
+                        {m.tipo === 'ENTRADA' ? '+' : '-'}{m.cantidad}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </Card>
+          </div>
+
+          {/* Inventory Table */}
+          <Card title="Detalles del stock">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-left text-gray-500 border-b border-gray-100">
+                    <th className="py-3 px-4 font-semibold">Producto</th>
+                    <th className="py-3 px-4 font-semibold">Cantidad</th>
+                    <th className="py-3 px-4 font-semibold">Stock mínimo</th>
+                    <th className="py-3 px-4 font-semibold">Ubicación</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {inventario.map((i) => (
+                    <tr key={i.id} className="border-b border-gray-50">
+                      <td className="py-3 px-4">{i.producto.nombre}</td>
+                      <td className={i.stockBajo ? 'text-red-600 font-medium py-3 px-4' : 'py-3 px-4'}>
+                        {i.cantidad}
+                      </td>
+                      <td className="py-3 px-4">{i.stockMinimo}</td>
+                      <td className="py-3 px-4">{i.ubicacion ?? '-'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </Card>
+        </>
+      )}
     </div>
   );
 }

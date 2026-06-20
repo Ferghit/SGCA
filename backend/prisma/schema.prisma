@@ -49,6 +49,12 @@ enum EstadoFactura {
   RECHAZADA
 }
 
+enum EstadoItemRecepcion {
+  CONFORME
+  DANADO
+  FALTANTE
+}
+
 model Usuario {
   id        Int      @id @default(autoincrement())
   nombre    String
@@ -85,6 +91,8 @@ model Producto {
 
   detallesRequerimiento RequerimientoDetalle[]
   inventario            Inventario[]
+  recepcionDetalles     RecepcionDetalle[]
+  devoluciones          Devolucion[]
 
   @@map("productos")
 }
@@ -284,6 +292,7 @@ model Recepcion {
   ordenCompra OrdenCompra        @relation(fields: [ordenCompraId], references: [id])
   detalles    RecepcionDetalle[]
   guias       GuiaRemision[]
+  devoluciones Devolucion[]
 
   @@map("recepciones")
 }
@@ -295,9 +304,11 @@ model RecepcionDetalle {
   descripcion      String
   cantidadEsperada Decimal @db.Decimal(10, 2)
   cantidadRecibida Decimal @db.Decimal(10, 2)
+  estado           EstadoItemRecepcion @default(CONFORME)
   observacion      String?
 
   recepcion Recepcion @relation(fields: [recepcionId], references: [id], onDelete: Cascade)
+  producto  Producto?  @relation(fields: [productoId], references: [id])
 
   @@map("recepcion_detalles")
 }
@@ -317,11 +328,12 @@ model GuiaRemision {
 }
 
 model Inventario {
-  id         Int      @id @default(autoincrement())
-  productoId Int      @unique
-  cantidad   Decimal  @db.Decimal(10, 2) @default(0)
-  ubicacion  String?
-  updatedAt  DateTime @updatedAt
+  id          Int      @id @default(autoincrement())
+  productoId  Int      @unique
+  cantidad    Decimal  @db.Decimal(10, 2) @default(0)
+  stockMinimo Decimal  @db.Decimal(10, 2) @default(5)
+  ubicacion   String?
+  updatedAt   DateTime @updatedAt
 
   producto Producto @relation(fields: [productoId], references: [id])
 
@@ -393,4 +405,20 @@ model Auditoria {
   usuario Usuario? @relation(fields: [usuarioId], references: [id])
 
   @@map("auditoria")
+}
+
+model Devolucion {
+  id          Int      @id @default(autoincrement())
+  recepcionId Int
+  productoId  Int?
+  descripcion String
+  cantidad    Decimal  @db.Decimal(10, 2)
+  motivo      String
+  notificada  Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  recepcion Recepcion @relation(fields: [recepcionId], references: [id])
+  producto  Producto? @relation(fields: [productoId], references: [id])
+
+  @@map("devoluciones")
 }
