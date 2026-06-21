@@ -9,6 +9,8 @@ import { CotizacionesModule } from './cotizaciones/cotizaciones.module';
 import { AlmacenModule } from './almacen/almacen.module';
 import { ProductosModule } from './productos/productos.module';
 import { OrdenesCompraModule } from './ordenes-compra/ordenes-compra.module';
+import { ContabilidadModule } from './contabilidad/contabilidad.module';
+import { ReportesModule } from './reportes/reportes.module';
 
 @Module({
   imports: [
@@ -22,6 +24,8 @@ import { OrdenesCompraModule } from './ordenes-compra/ordenes-compra.module';
     AlmacenModule,
     ProductosModule,
     OrdenesCompraModule,
+    ContabilidadModule,
+    ReportesModule,
   ],
 })
 export class AppModule {}

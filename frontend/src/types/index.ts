@@ -241,3 +241,96 @@ export interface Devolucion {
   createdAt: string;
   recepcion?: Recepcion;
 }
+
+export type EstadoFactura = 'PENDIENTE' | 'APROBADA' | 'PAGADA' | 'OBSERVADA' | 'RECHAZADA';
+export type EstadoPago = 'PENDIENTE' | 'PROCESADO' | 'OBSERVADO';
+export type EstadoCruceFactura = 'CONFORME' | 'OBSERVADA';
+export type TipoIncidencia = 'RECLAMO' | 'DEVOLUCION' | 'INCUMPLIMIENTO';
+export type EstadoIncidencia = 'ABIERTA' | 'EN_REVISION' | 'RESUELTA';
+
+export interface FacturaDetalle {
+  id: number;
+  facturaId: number;
+  productoId?: number;
+  descripcion: string;
+  cantidad: number;
+  precioUnitario: number;
+  subtotal: number;
+}
+
+export interface ResultadoCruceFactura {
+  conforme: boolean;
+  discrepancias: string[];
+  guias: string[];
+  totales: {
+    ordenCompra: number;
+    factura: number;
+    subtotalFactura: number;
+    igvFactura: number;
+  };
+}
+
+export interface Factura {
+  id: number;
+  numero: string;
+  proveedorId: number;
+  ordenCompraId?: number;
+  monto: number;
+  igv: number;
+  total: number;
+  fechaEmision: string;
+  fechaVencimiento?: string;
+  estado: EstadoFactura;
+  estadoPago: EstadoPago;
+  estadoCruce: EstadoCruceFactura;
+  resultadoCruce?: ResultadoCruceFactura;
+  archivoUrl?: string;
+  observacionesCruce?: string;
+  createdAt: string;
+  updatedAt: string;
+  proveedor: Proveedor;
+  ordenCompra?: OrdenCompra;
+  detalles: FacturaDetalle[];
+  pagos: Pago[];
+}
+
+export interface Pago {
+  id: number;
+  facturaId: number;
+  monto: number;
+  fechaPago: string;
+  metodoPago: string;
+  referencia?: string;
+  estado: EstadoPago;
+  observaciones?: string;
+  createdAt: string;
+  factura?: Factura;
+}
+
+export interface IncidenciaProveedor {
+  id: number;
+  proveedorId: number;
+  ordenCompraId?: number;
+  tipo: TipoIncidencia;
+  estado: EstadoIncidencia;
+  descripcion: string;
+  impacto: number;
+  accionCorrectiva?: string;
+  createdAt: string;
+  updatedAt: string;
+  proveedor: Proveedor;
+  ordenCompra?: OrdenCompra;
+}
+
+export interface DesempenoProveedor {
+  id: number;
+  proveedorId: number;
+  transacciones: number;
+  entregasConformes: number;
+  incidencias: number;
+  puntajeCumplimiento: number;
+  puntajePrecio: number;
+  puntajeTotal: number;
+  ultimaTransaccion?: string;
+  proveedor: Proveedor;
+}

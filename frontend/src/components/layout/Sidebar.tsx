@@ -41,6 +41,7 @@ const MENU_BY_ROL: Record<Rol, MenuItem[]> = {
     { label: 'Recepciones', href: '/recepciones', icon: Package },
     { label: 'Inventario', href: '/inventario', icon: Package },
     { label: 'Devoluciones', href: '/devoluciones', icon: Package },
+    { label: 'Reportes', href: '/reportes', icon: BarChart3 },
     { label: 'Notificaciones', href: '/notificaciones', icon: Bell },
   ],
   TRABAJADOR: [
