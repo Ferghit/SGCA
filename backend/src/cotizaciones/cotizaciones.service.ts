@@ -183,11 +183,20 @@ export class CotizacionesService {
           orderBy: { puntajeTotal: 'desc' },
         },
         proveedorGanador: true,
+        ordenesCompra: { take: 1 },
       },
     });
 
     if (!solicitud) throw new NotFoundException('Solicitud de cotización no encontrada');
-    return solicitud;
+    
+    // Return with ordenCompra as a single object (take first/only one from array)
+    const { ordenesCompra, ...rest } = solicitud;
+    const result = {
+      ...rest,
+      ordenCompra: ordenesCompra[0] || null,
+    };
+
+    return result;
   }
 
   // ─── Cierre automático por fecha límite ─────────────────────────────────────

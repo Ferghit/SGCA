@@ -4,10 +4,14 @@ import { useState, useEffect } from 'react';
 import { useAuthStore } from '@/store/authStore';
 import { useRouter } from 'next/navigation';
 import { ROL_LABELS } from '@/lib/utils';
-import { Bell, LogOut, User, ChevronDown, Package } from 'lucide-react';
+import { Bell, LogOut, User, ChevronDown, Package, Menu } from 'lucide-react';
 import api from '@/lib/api';
 
-export default function Navbar() {
+interface NavbarProps {
+  onToggleSidebar: () => void;
+}
+
+export default function Navbar({ onToggleSidebar }: NavbarProps) {
   const { user, logout } = useAuthStore();
   const router = useRouter();
   const [notifCount, setNotifCount] = useState(0);
@@ -34,11 +38,20 @@ export default function Navbar() {
 
   return (
     <nav
-      className="h-16 text-white flex items-center justify-between px-6 shadow-lg z-30 flex-shrink-0"
+      className="h-16 text-white flex items-center justify-between px-4 sm:px-6 shadow-lg z-30 flex-shrink-0"
       style={{ backgroundColor: '#1B263B' }}
     >
-      {/* Logo y nombre */}
+      {/* Logo, nombre y botón hamburguesa */}
       <div className="flex items-center gap-3">
+        <button
+          onClick={onToggleSidebar}
+          className="lg:hidden p-2 rounded-lg transition-colors"
+          style={{ color: 'white' }}
+          onMouseEnter={e => (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.1)')}
+          onMouseLeave={e => (e.currentTarget.style.backgroundColor = 'transparent')}
+        >
+          <Menu className="w-6 h-6" />
+        </button>
         <div className="rounded-lg p-1.5" style={{ backgroundColor: '#006D77' }}>
           <Package className="w-5 h-5 text-white" />
         </div>

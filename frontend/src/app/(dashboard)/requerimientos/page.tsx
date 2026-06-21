@@ -22,6 +22,7 @@ export default function RequerimientosPage() {
 
   const isJefe = ['JEFE_AREA', 'ADMIN', 'GERENTE', 'ANALISTA_COMPRAS'].includes(user?.rol || '');
   const isTrabajador = user?.rol === 'TRABAJADOR';
+  const canCreateRequerimiento = ['TRABAJADOR', 'ADMIN', 'ANALISTA_COMPRAS'].includes(user?.rol || '');
 
   useEffect(() => {
     fetchAll();
@@ -50,7 +51,7 @@ export default function RequerimientosPage() {
             {filtered.length} requerimiento{filtered.length !== 1 ? 's' : ''} encontrado{filtered.length !== 1 ? 's' : ''}
           </p>
         </div>
-        {isTrabajador && (
+        {canCreateRequerimiento && (
           <Link
             href="/requerimientos/nuevo"
             className="flex items-center gap-2 px-4 py-2.5 rounded-lg text-white font-medium text-sm transition-colors"
@@ -116,7 +117,7 @@ export default function RequerimientosPage() {
                 ? 'Crea tu primer requerimiento'
                 : 'No hay requerimientos registrados'}
             </p>
-            {isTrabajador && !search && !filterEstado && !filterPrioridad && (
+            {canCreateRequerimiento && !search && !filterEstado && !filterPrioridad && (
               <Link href="/requerimientos/nuevo" className="mt-4 px-4 py-2 rounded-lg text-white text-sm font-medium" style={{ backgroundColor: '#006D77' }}>
                 Nuevo Requerimiento
               </Link>

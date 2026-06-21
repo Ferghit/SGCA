@@ -81,6 +81,7 @@ export interface Notificacion {
   leida: boolean;
   createdAt: string;
   requerimientoId?: number;
+  ordenCompraId?: number;
   requerimiento?: { id: number; codigo: string };
   emisor?: { id: number; nombre: string; apellido: string };
 }
@@ -169,9 +170,10 @@ export interface SolicitudCotizacion {
   items: ItemSolicitudCotizacion[];
   ofertas: OfertaProveedor[];
   proveedorGanador?: { id: number; razonSocial: string };
+  ordenCompra?: OrdenCompra;
 }
 
-export type EstadoOrdenCompra = 'BORRADOR' | 'APROBADA' | 'ENVIADA' | 'RECIBIDA_PARCIAL' | 'RECIBIDA_COMPLETA' | 'CANCELADA';
+export type EstadoOrdenCompra = 'PENDIENTE_APROBACION' | 'EN_REVISION' | 'APROBADA' | 'RECHAZADA' | 'ENVIADA_PROVEEDOR' | 'EN_RECEPCION' | 'RECEPCION_PARCIAL' | 'RECEPCION_COMPLETA' | 'CERRADA' | 'CANCELADA';
 export type EstadoItemRecepcion = 'CONFORME' | 'DANADO' | 'FALTANTE';
 
 export interface Proveedor { id: number; ruc: string; razonSocial: string; email?: string; }
@@ -181,10 +183,31 @@ export interface OrdenCompraDetalle {
   cantidad: number; precioUnitario: number; subtotal: number;
 }
 
+export interface HistorialOrdenCompra {
+  id: number; ordenCompraId: number;
+  estadoAnterior?: EstadoOrdenCompra;
+  estadoNuevo: EstadoOrdenCompra;
+  usuarioId?: number;
+  observaciones?: string;
+  createdAt: string;
+  usuario?: Usuario;
+}
+
 export interface OrdenCompra {
-  id: number; numero: string; estado: EstadoOrdenCompra; montoTotal: number;
+  id: number; numero: string; solicitudCotizacionId: number;
+  ofertaGanadoraId: number; proveedorId: number;
+  estado: EstadoOrdenCompra; subtotal: number;
+  igv: number; montoTotal: number;
   fechaEmision: string; fechaEntregaEsperada?: string;
+  condicionesComerciales?: string; observaciones?: string;
+  pdfUrl?: string; gerenteAprobadorId?: number;
+  fechaAprobacion?: string; justificacionRevision?: string;
+  justificacionRechazo?: string; createdAt: string; updatedAt: string;
   proveedor: Proveedor; detalles: OrdenCompraDetalle[];
+  solicitudCotizacion?: SolicitudCotizacion;
+  ofertaGanadora?: OfertaProveedor;
+  gerenteAprobador?: Usuario;
+  historial: HistorialOrdenCompra[];
 }
 
 export interface RecepcionDetalle {

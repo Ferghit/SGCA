@@ -10,15 +10,15 @@ export function Card({ children, className = '', title, subtitle, action }: Card
   return (
     <div className={`bg-white rounded-xl shadow-card border border-gray-100 ${className}`}>
       {(title || action) && (
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-4 sm:px-6 py-4 border-b border-gray-100">
           <div>
             {title && <h3 className="font-semibold text-primary-DEFAULT text-base">{title}</h3>}
             {subtitle && <p className="text-xs text-gray-500 mt-0.5">{subtitle}</p>}
           </div>
-          {action && <div>{action}</div>}
+          {action && <div className="w-full sm:w-auto">{action}</div>}
         </div>
       )}
-      <div className={title ? 'p-6' : 'p-6'}>{children}</div>
+      <div className={title ? 'p-4 sm:p-6' : 'p-4 sm:p-6'}>{children}</div>
     </div>
   );
 }
@@ -45,15 +45,15 @@ export function StatCard({ label, value, icon: Icon, color = 'secondary', trend 
   const colors = COLOR_MAP[color];
 
   return (
-    <div className={`bg-white rounded-xl border shadow-card p-5 ${colors.border}`}>
+    <div className={`bg-white rounded-xl border shadow-card p-4 sm:p-5 ${colors.border}`}>
       <div className="flex items-start justify-between">
         <div>
           <p className="text-sm text-gray-500 font-medium">{label}</p>
-          <p className="text-3xl font-bold text-primary-DEFAULT mt-1">{value}</p>
+          <p className="text-2xl sm:text-3xl font-bold text-primary-DEFAULT mt-1">{value}</p>
           {trend && <p className="text-xs text-gray-400 mt-1">{trend}</p>}
         </div>
-        <div className={`${colors.bg} p-3 rounded-xl`}>
-          <Icon className={`w-6 h-6 ${colors.icon}`} />
+        <div className={`${colors.bg} p-2.5 sm:p-3 rounded-xl`}>
+          <Icon className={`w-5 h-5 sm:w-6 sm:h-6 ${colors.icon}`} />
         </div>
       </div>
     </div>

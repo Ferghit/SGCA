@@ -34,11 +34,15 @@ enum Prioridad {
 }
 
 enum EstadoOrdenCompra {
-  BORRADOR
+  PENDIENTE_APROBACION
+  EN_REVISION
   APROBADA
-  ENVIADA
-  RECIBIDA_PARCIAL
-  RECIBIDA_COMPLETA
+  RECHAZADA
+  ENVIADA_PROVEEDOR
+  EN_RECEPCION
+  RECEPCION_PARCIAL
+  RECEPCION_COMPLETA
+  CERRADA
   CANCELADA
 }
 
@@ -72,7 +76,8 @@ model Usuario {
   notificacionesRecibidas Notificacion[]   @relation("Receptor")
   solicitudesCotizacionComoAnalista SolicitudCotizacion[] @relation("AnalistaCotizacion")
   auditoria               Auditoria[]
-  
+  ordenesCompraAprobadas  OrdenCompra[]    @relation("GerenteAprobador")
+  historialOrdenesCompra  HistorialOrdenCompra[]
 
   @@map("usuarios")
 }
@@ -163,7 +168,7 @@ model Proveedor {
 
   ofertasProveedor OfertaProveedor[] @relation("OfertasProveedor")
   solicitudesGanadas SolicitudCotizacion[] @relation("ProveedorGanador")
-  ordenes      OrdenCompra[]
+  ordenesCompra OrdenCompra[]
   facturas     Factura[]
 
   @@map("proveedores")
@@ -205,6 +210,7 @@ model SolicitudCotizacion {
   proveedorGanador Proveedor?               @relation("ProveedorGanador", fields: [proveedorGanadorId], references: [id])
   items           ItemSolicitudCotizacion[]
   ofertas         OfertaProveedor[]
+  ordenesCompra   OrdenCompra[]
 
   @@map("solicitudes_cotizacion")
 }
@@ -242,29 +248,61 @@ model OfertaProveedor {
 
   solicitudCotizacion   SolicitudCotizacion @relation(fields: [solicitudCotizacionId], references: [id])
   proveedor             Proveedor           @relation("OfertasProveedor", fields: [proveedorId], references: [id])
+  ordenesCompra         OrdenCompra[]
 
   @@unique([solicitudCotizacionId, proveedorId])
   @@map("ofertas_proveedor")
 }
 
 model OrdenCompra {
-  id                   Int               @id @default(autoincrement())
-  numero               String            @unique
-  proveedorId          Int
-  estado               EstadoOrdenCompra @default(BORRADOR)
-  montoTotal           Decimal           @db.Decimal(10, 2)
-  fechaEmision         DateTime          @default(now())
-  fechaEntregaEsperada DateTime?
-  observaciones        String?
-  createdAt            DateTime          @default(now())
-  updatedAt            DateTime          @updatedAt
+  id                        Int               @id @default(autoincrement())
+  numero                    String            @unique
+  solicitudCotizacionId     Int
+  ofertaGanadoraId          Int
+  proveedorId               Int
+  estado                    EstadoOrdenCompra @default(PENDIENTE_APROBACION)
+  montoTotal                Decimal           @db.Decimal(10, 2)
+  igv                       Decimal           @db.Decimal(10, 2)
+  subtotal                  Decimal           @db.Decimal(10, 2)
+  fechaEmision              DateTime          @default(now())
+  fechaEntregaEsperada      DateTime?
+  condicionesComerciales    String?
+  observaciones             String?
+  pdfUrl                    String?
+  gerenteAprobadorId        Int?
+  fechaAprobacion           DateTime?
+  justificacionRevision     String?
+  justificacionRechazo      String?
+  
+  createdAt                 DateTime          @default(now())
+  updatedAt                 DateTime          @updatedAt
 
-  proveedor   Proveedor            @relation(fields: [proveedorId], references: [id])
-  detalles    OrdenCompraDetalle[]
-  recepciones Recepcion[]
-  facturas    Factura[]
+  solicitudCotizacion       SolicitudCotizacion @relation(fields: [solicitudCotizacionId], references: [id])
+  ofertaGanadora            OfertaProveedor     @relation(fields: [ofertaGanadoraId], references: [id])
+  proveedor                 Proveedor           @relation(fields: [proveedorId], references: [id])
+  gerenteAprobador          Usuario?            @relation("GerenteAprobador", fields: [gerenteAprobadorId], references: [id])
+  detalles                  OrdenCompraDetalle[]
+  recepciones               Recepcion[]
+  facturas                  Factura[]
+  historial                 HistorialOrdenCompra[]
+  notificaciones            Notificacion[]
 
   @@map("ordenes_compra")
+}
+
+model HistorialOrdenCompra {
+  id              Int               @id @default(autoincrement())
+  ordenCompraId   Int
+  estadoAnterior  EstadoOrdenCompra?
+  estadoNuevo     EstadoOrdenCompra
+  usuarioId       Int?
+  observaciones   String?
+  createdAt       DateTime          @default(now())
+
+  ordenCompra     OrdenCompra       @relation(fields: [ordenCompraId], references: [id], onDelete: Cascade)
+  usuario         Usuario?          @relation(fields: [usuarioId], references: [id])
+
+  @@map("historial_ordenes_compra")
 }
 
 model OrdenCompraDetalle {
@@ -378,18 +416,20 @@ model Pago {
 }
 
 model Notificacion {
-  id              Int      @id @default(autoincrement())
+  id              Int              @id @default(autoincrement())
   emisorId        Int?
   receptorId      Int
   requerimientoId Int?
+  ordenCompraId   Int?
   titulo          String
   mensaje         String
-  leida           Boolean  @default(false)
-  createdAt       DateTime @default(now())
+  leida           Boolean          @default(false)
+  createdAt       DateTime         @default(now())
 
-  emisor        Usuario?       @relation("Emisor", fields: [emisorId], references: [id])
-  receptor      Usuario        @relation("Receptor", fields: [receptorId], references: [id])
-  requerimiento Requerimiento? @relation(fields: [requerimientoId], references: [id])
+  emisor          Usuario?         @relation("Emisor", fields: [emisorId], references: [id])
+  receptor        Usuario          @relation("Receptor", fields: [receptorId], references: [id])
+  requerimiento   Requerimiento?   @relation(fields: [requerimientoId], references: [id])
+  ordenCompra     OrdenCompra?     @relation(fields: [ordenCompraId], references: [id])
 
   @@map("notificaciones")
 }

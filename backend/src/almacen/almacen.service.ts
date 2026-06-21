@@ -10,7 +10,7 @@ export class AlmacenService {
  
   getOrdenesPendientes() { 
     return this.prisma.ordenCompra.findMany({ 
-      where: { estado: { in: [EstadoOrdenCompra.APROBADA, EstadoOrdenCompra.ENVIADA, EstadoOrdenCompra.RECIBIDA_PARCIAL] } }, 
+      where: { estado: { in: [EstadoOrdenCompra.APROBADA, EstadoOrdenCompra.ENVIADA_PROVEEDOR, EstadoOrdenCompra.RECEPCION_PARCIAL] } }, 
       include: { proveedor: true, detalles: true }, 
       orderBy: { fechaEmision: 'desc' }, 
     }); 
@@ -31,7 +31,7 @@ export class AlmacenService {
       include: { detalles: true }, 
     }); 
     if (!orden) throw new NotFoundException('Orden de compra no encontrada'); 
-    if (['RECIBIDA_COMPLETA', 'CANCELADA'].includes(orden.estado)) { 
+    if (['RECEPCION_COMPLETA', 'CANCELADA'].includes(orden.estado)) { 
       throw new BadRequestException('Esta orden ya no admite recepciones'); 
     } 
  
@@ -80,7 +80,7 @@ export class AlmacenService {
  
       await tx.ordenCompra.update({ 
         where: { id: orden.id }, 
-        data: { estado: totalRecibido >= totalPedido ? EstadoOrdenCompra.RECIBIDA_COMPLETA : EstadoOrdenCompra.RECIBIDA_PARCIAL }, 
+        data: { estado: totalRecibido >= totalPedido ? EstadoOrdenCompra.RECEPCION_COMPLETA : EstadoOrdenCompra.RECEPCION_PARCIAL }, 
       }); 
  
       return { recepcion, alertas }; 

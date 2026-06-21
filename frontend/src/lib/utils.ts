@@ -1,4 +1,4 @@
-import { EstadoRequerimiento, Prioridad, Rol } from '@/types';
+import { EstadoRequerimiento, Prioridad, Rol, EstadoOrdenCompra } from '@/types';
 
 export function formatDate(dateString: string): string {
   return new Date(dateString).toLocaleDateString('es-PE', {
@@ -26,6 +26,13 @@ export function formatDateTime(dateString: string): string {
     hour: '2-digit',
     minute: '2-digit',
   });
+}
+
+export function formatCurrency(amount: number): string {
+  return new Intl.NumberFormat('es-PE', {
+    style: 'currency',
+    currency: 'PEN',
+  }).format(amount);
 }
 
 export const ESTADO_CONFIG: Record<
@@ -61,6 +68,72 @@ export const ESTADO_CONFIG: Record<
     color: 'text-blue-700',
     bgColor: 'bg-blue-50',
     borderColor: 'border-blue-300',
+  },
+};
+
+export const ESTADO_OC_CONFIG: Record<
+  EstadoOrdenCompra,
+  { label: string; color: string; bgColor: string; borderColor: string }
+> = {
+  PENDIENTE_APROBACION: {
+    label: 'Pendiente de Aprobacion',
+    color: 'text-amber-700',
+    bgColor: 'bg-amber-50',
+    borderColor: 'border-amber-300',
+  },
+  EN_REVISION: {
+    label: 'En Revision',
+    color: 'text-blue-700',
+    bgColor: 'bg-blue-50',
+    borderColor: 'border-blue-300',
+  },
+  APROBADA: {
+    label: 'Aprobada',
+    color: 'text-green-700',
+    bgColor: 'bg-green-50',
+    borderColor: 'border-green-300',
+  },
+  RECHAZADA: {
+    label: 'Rechazada',
+    color: 'text-red-700',
+    bgColor: 'bg-red-50',
+    borderColor: 'border-red-300',
+  },
+  ENVIADA_PROVEEDOR: {
+    label: 'Enviada a Proveedor',
+    color: 'text-indigo-700',
+    bgColor: 'bg-indigo-50',
+    borderColor: 'border-indigo-300',
+  },
+  EN_RECEPCION: {
+    label: 'En Recepcion',
+    color: 'text-purple-700',
+    bgColor: 'bg-purple-50',
+    borderColor: 'border-purple-300',
+  },
+  RECEPCION_PARCIAL: {
+    label: 'Recepcion Parcial',
+    color: 'text-yellow-700',
+    bgColor: 'bg-yellow-50',
+    borderColor: 'border-yellow-300',
+  },
+  RECEPCION_COMPLETA: {
+    label: 'Recepcion Completa',
+    color: 'text-emerald-700',
+    bgColor: 'bg-emerald-50',
+    borderColor: 'border-emerald-300',
+  },
+  CERRADA: {
+    label: 'Cerrada',
+    color: 'text-gray-700',
+    bgColor: 'bg-gray-100',
+    borderColor: 'border-gray-300',
+  },
+  CANCELADA: {
+    label: 'Cancelada',
+    color: 'text-red-800',
+    bgColor: 'bg-red-100',
+    borderColor: 'border-red-400',
   },
 };
 

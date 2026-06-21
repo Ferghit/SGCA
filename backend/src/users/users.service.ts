@@ -1,5 +1,7 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { CreateUserDto } from './dto/create-user.dto';
+import * as bcrypt from 'bcrypt';
 
 @Injectable()
 export class UsersService {
@@ -37,6 +39,38 @@ export class UsersService {
     if (!user) throw new NotFoundException(`Usuario #${id} no encontrado`);
 
     return user;
+  }
+
+  async create(dto: CreateUserDto) {
+    const exists = await this.prisma.usuario.findUnique({
+      where: { email: dto.email },
+    });
+
+    if (exists) {
+      throw new ConflictException('El email ya está registrado');
+    }
+
+    const hashedPassword = await bcrypt.hash(dto.password, 10);
+
+    return this.prisma.usuario.create({
+      data: {
+        nombre: dto.nombre,
+        apellido: dto.apellido,
+        email: dto.email,
+        password: hashedPassword,
+        rol: dto.rol,
+        activo: dto.activo !== undefined ? dto.activo : true,
+      },
+      select: {
+        id: true,
+        nombre: true,
+        apellido: true,
+        email: true,
+        rol: true,
+        activo: true,
+        createdAt: true,
+      },
+    });
   }
 
   async toggleActivo(id: number) {

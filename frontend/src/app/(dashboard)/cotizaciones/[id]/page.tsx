@@ -8,9 +8,10 @@ import { OfertaProveedor, SolicitudCotizacion } from '@/types';
 import { formatDateShort } from '@/lib/utils';
 import {
   ArrowLeft, Award, Clock, CheckCircle2, XCircle,
-  DollarSign, Truck, Star, Lock, Unlock,
+  DollarSign, Truck, Star, Lock, Unlock, FileText,
 } from 'lucide-react';
 import Link from 'next/link';
+import { ordenesCompraApi } from '@/lib/api';
 
 export default function DetalleSolicitudPage() {
   const params = useParams();
@@ -23,6 +24,7 @@ export default function DetalleSolicitudPage() {
   const [showJustif, setShowJustif] = useState(false);
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState('');
+  const [generandoOC, setGenerandoOC] = useState(false);
 
   const id = Number(params.id);
   const isAnalista = user?.rol === 'ANALISTA_COMPRAS' || user?.rol === 'ADMIN';
@@ -73,6 +75,22 @@ export default function DetalleSolicitudPage() {
     setSaving(false);
     setToast('Proveedor seleccionado correctamente. ¡La adjudicación quedó registrada!');
     setTimeout(() => setToast(''), 5000);
+  };
+
+  const handleGenerarOC = async () => {
+    setGenerandoOC(true);
+    try {
+      const oc = await ordenesCompraApi.generar({ solicitudCotizacionId: id });
+      setToast(`¡Orden de Compra ${oc.numero} generada correctamente!`);
+      router.push(`/ordenes-compra/${oc.id}`);
+    } catch (e: any) {
+      console.error(e);
+      const errorMsg = e.response?.data?.message || 'Error al generar la Orden de Compra';
+      setToast(errorMsg);
+    } finally {
+      setGenerandoOC(false);
+      setTimeout(() => setToast(''), 5000);
+    }
   };
 
   const ESTADO_BADGE: Record<string, string> = {
@@ -315,6 +333,54 @@ export default function DetalleSolicitudPage() {
               <p className="text-xs font-medium text-blue-700 mb-1">Justificación registrada:</p>
               <p className="text-sm text-blue-800">{sol.justificacionSeleccion}</p>
             </div>
+          )}
+        </div>
+      )}
+
+      {/* Acción para generar OC o ver OC existente */}
+      {isAnalista && sol.estado === 'ADJUDICADA' && (
+        <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 flex items-center justify-between gap-3">
+          {sol.ordenCompra ? (
+            <>
+              <div>
+                <p className="font-medium text-blue-800 text-sm">
+                  ¡Solicitud adjudicada! Orden de Compra generada exitosamente.
+                </p>
+                <p className="text-xs text-blue-600 mt-0.5">
+                  Proveedor ganador: {sol.proveedorGanador?.razonSocial}
+                </p>
+              </div>
+              <Link
+                href={`/ordenes-compra/${sol.ordenCompra.id}`}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg text-white text-sm font-medium shrink-0 transition-colors"
+                style={{ backgroundColor: '#006D77' }}
+              >
+                <FileText className="w-4 h-4" />
+                Ver Orden de Compra {sol.ordenCompra.numero}
+              </Link>
+            </>
+          ) : (
+            <>
+              <div>
+                <p className="font-medium text-blue-800 text-sm">
+                  ¡Solicitud adjudicada! Ahora puedes generar la Orden de Compra.
+                </p>
+                <p className="text-xs text-blue-600 mt-0.5">
+                  Proveedor ganador: {sol.proveedorGanador?.razonSocial}
+                </p>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={handleGenerarOC}
+                  disabled={generandoOC}
+                  className="flex items-center gap-2 px-4 py-2 rounded-lg text-white text-sm font-medium shrink-0 transition-colors"
+                  style={{ backgroundColor: '#006D77' }}
+                >
+                  <FileText className="w-4 h-4" />
+                  {generandoOC ? 'Generando...' : 'Generar Orden de Compra'}
+                </button>
+              </div>
+            </>
           )}
         </div>
       )}

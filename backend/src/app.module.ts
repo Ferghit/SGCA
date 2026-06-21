@@ -8,6 +8,7 @@ import { NotificacionesModule } from './notificaciones/notificaciones.module';
 import { CotizacionesModule } from './cotizaciones/cotizaciones.module';
 import { AlmacenModule } from './almacen/almacen.module';
 import { ProductosModule } from './productos/productos.module';
+import { OrdenesCompraModule } from './ordenes-compra/ordenes-compra.module';
 
 @Module({
   imports: [
@@ -20,6 +21,7 @@ import { ProductosModule } from './productos/productos.module';
     CotizacionesModule,
     AlmacenModule,
     ProductosModule,
+    OrdenesCompraModule,
   ],
 })
 export class AppModule {}
