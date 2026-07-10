@@ -83,6 +83,51 @@ export class AuthService {
     return user;
   }
 
+  async googleLogin(req: any) {
+    if (!req.user) {
+      throw new UnauthorizedException('No user from google');
+    }
+
+    const { googleId, email } = req.user;
+
+    let user = await this.prisma.usuario.findUnique({
+      where: { googleId },
+    });
+
+    if (!user) {
+      user = await this.prisma.usuario.findUnique({
+        where: { email },
+      });
+
+      if (!user) {
+        throw new UnauthorizedException('El correo no está registrado en el sistema.');
+      }
+
+      user = await this.prisma.usuario.update({
+        where: { id: user.id },
+        data: { googleId },
+      });
+    }
+
+    if (!user.activo) {
+      throw new UnauthorizedException('Usuario inactivo. Contacte al administrador.');
+    }
+
+    const payload = { sub: user.id, email: user.email, rol: user.rol };
+
+    return {
+      access_token: this.jwtService.sign(payload),
+      user: {
+        id: user.id,
+        nombre: user.nombre,
+        apellido: user.apellido,
+        email: user.email,
+        rol: user.rol,
+        activo: user.activo,
+      },
+    };
+  }
+
   async getProfile(userId: number) {
     const user = await this.prisma.usuario.findUnique({
       where: { id: userId },

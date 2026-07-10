@@ -88,7 +88,8 @@ model Usuario {
   nombre    String
   apellido  String
   email     String   @unique
-  password  String
+  password  String?
+  googleId  String?  @unique
   rol       Rol
   activo    Boolean  @default(true)
   createdAt DateTime @default(now())
@@ -246,7 +247,7 @@ model ItemSolicitudCotizacion {
   id                    Int     @id @default(autoincrement())
   solicitudCotizacionId Int
   descripcion           String
-  cantidad              Decimal @db.Decimal(10, 2)
+  cantidad              Decimal 
   unidadMedida          String
 
   solicitudCotizacion SolicitudCotizacion @relation(fields: [solicitudCotizacionId], references: [id], onDelete: Cascade)
@@ -258,17 +259,17 @@ model OfertaProveedor {
   id                    Int          @id @default(autoincrement())
   solicitudCotizacionId Int
   proveedorId           Int
-  montoTotal            Decimal      @db.Decimal(10, 2)
+  montoTotal            Decimal      
   plazoEntregaDias      Int
   condicionesPago       String?
   notasAdicionales      String?
   archivoAdjuntoUrl     String?
   estado                EstadoOferta @default(RECIBIDA)
   // Ranking automático (calculado al cierre)
-  puntajePrecio         Decimal?     @db.Decimal(5, 2)
-  puntajePlazo          Decimal?     @db.Decimal(5, 2)
-  puntajeHistorial      Decimal?     @db.Decimal(5, 2)
-  puntajeTotal          Decimal?     @db.Decimal(5, 2)
+  puntajePrecio         Decimal?     
+  puntajePlazo          Decimal?     
+  puntajeHistorial      Decimal?     
+  puntajeTotal          Decimal?     
   posicionRanking       Int?
   createdAt             DateTime     @default(now())
   updatedAt             DateTime     @updatedAt
@@ -288,9 +289,9 @@ model OrdenCompra {
   ofertaGanadoraId       Int
   proveedorId            Int
   estado                 EstadoOrdenCompra @default(PENDIENTE_APROBACION)
-  montoTotal             Decimal           @db.Decimal(10, 2)
-  igv                    Decimal           @db.Decimal(10, 2)
-  subtotal               Decimal           @db.Decimal(10, 2)
+  montoTotal             Decimal           
+  igv                    Decimal           
+  subtotal               Decimal           
   fechaEmision           DateTime          @default(now())
   fechaEntregaEsperada   DateTime?
   condicionesComerciales String?
@@ -338,9 +339,9 @@ model OrdenCompraDetalle {
   ordenCompraId  Int
   productoId     Int?
   descripcion    String
-  cantidad       Decimal @db.Decimal(10, 2)
-  precioUnitario Decimal @db.Decimal(10, 2)
-  subtotal       Decimal @db.Decimal(10, 2)
+  cantidad       Decimal 
+  precioUnitario Decimal 
+  subtotal       Decimal 
 
   ordenCompra OrdenCompra @relation(fields: [ordenCompraId], references: [id], onDelete: Cascade)
   producto    Producto?   @relation(fields: [productoId], references: [id])
@@ -370,8 +371,8 @@ model RecepcionDetalle {
   recepcionId      Int
   productoId       Int?
   descripcion      String
-  cantidadEsperada Decimal             @db.Decimal(10, 2)
-  cantidadRecibida Decimal             @db.Decimal(10, 2)
+  cantidadEsperada Decimal             
+  cantidadRecibida Decimal             
   estado           EstadoItemRecepcion @default(CONFORME)
   observacion      String?
 
@@ -398,8 +399,8 @@ model GuiaRemision {
 model Inventario {
   id          Int      @id @default(autoincrement())
   productoId  Int      @unique
-  cantidad    Decimal  @default(0) @db.Decimal(10, 2)
-  stockMinimo Decimal  @default(5) @db.Decimal(10, 2)
+  cantidad    Decimal  @default(0) 
+  stockMinimo Decimal  @default(5) 
   ubicacion   String?
   updatedAt   DateTime @updatedAt
 
@@ -413,9 +414,9 @@ model Factura {
   numero             String             @unique
   proveedorId        Int
   ordenCompraId      Int?
-  monto              Decimal            @db.Decimal(10, 2)
-  igv                Decimal            @db.Decimal(10, 2)
-  total              Decimal            @db.Decimal(10, 2)
+  monto              Decimal            
+  igv                Decimal            
+  total              Decimal            
   fechaEmision       DateTime
   fechaVencimiento   DateTime?
   estado             EstadoFactura      @default(PENDIENTE)
@@ -441,9 +442,9 @@ model FacturaDetalle {
   facturaId      Int
   productoId     Int?
   descripcion    String
-  cantidad       Decimal @db.Decimal(10, 2)
-  precioUnitario Decimal @db.Decimal(10, 2)
-  subtotal       Decimal @db.Decimal(10, 2)
+  cantidad       Decimal 
+  precioUnitario Decimal 
+  subtotal       Decimal 
 
   factura  Factura   @relation(fields: [facturaId], references: [id], onDelete: Cascade)
   producto Producto? @relation(fields: [productoId], references: [id])
@@ -454,7 +455,7 @@ model FacturaDetalle {
 model Pago {
   id            Int        @id @default(autoincrement())
   facturaId     Int
-  monto         Decimal    @db.Decimal(10, 2)
+  monto         Decimal    
   fechaPago     DateTime   @default(now())
   metodoPago    String
   referencia    String?
@@ -491,9 +492,9 @@ model DesempenoProveedor {
   transacciones       Int       @default(0)
   entregasConformes   Int       @default(0)
   incidencias         Int       @default(0)
-  puntajeCumplimiento Decimal   @default(100) @db.Decimal(5, 2)
-  puntajePrecio       Decimal   @default(100) @db.Decimal(5, 2)
-  puntajeTotal        Decimal   @default(100) @db.Decimal(5, 2)
+  puntajeCumplimiento Decimal   @default(100) 
+  puntajePrecio       Decimal   @default(100) 
+  puntajeTotal        Decimal   @default(100) 
   ultimaTransaccion   DateTime?
   updatedAt           DateTime  @updatedAt
 
@@ -541,7 +542,7 @@ model Devolucion {
   recepcionId Int
   productoId  Int?
   descripcion String
-  cantidad    Decimal  @db.Decimal(10, 2)
+  cantidad    Decimal  
   motivo      String
   notificada  Boolean  @default(false)
   createdAt   DateTime @default(now())

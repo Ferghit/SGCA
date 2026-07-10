@@ -18,6 +18,25 @@ Sistema web que digitaliza el proceso de compras empresariales desde la solicitu
 | Base de datos| PostgreSQL                              |
 | Autenticacion| JWT + bcrypt                            |
 
+---
+
+## Componentes Reutilizables
+
+### Frontend - UI Components
+```
+components/layout/
+  - Navbar.tsx      - Barra de navegación superior (menu móvil, notificaciones, perfil usuario)
+  - Sidebar.tsx     - Menú lateral dinámico por rol
+
+components/ui/
+  - Card.tsx        - Contenedor con título y acción (para secciones)
+                     + StatCard: Tarjeta para estadísticas
+  - Badge.tsx       - Etiquetas para estados y prioridades
+  - Modal.tsx       - Ventana modal reutilizable
+```
+
+---
+
 ## Estructura del Proyecto
 
 ```
