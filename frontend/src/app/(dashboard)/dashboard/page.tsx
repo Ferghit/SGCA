@@ -6,7 +6,7 @@ import { useRequerimientosStore } from '@/store/requerimientosStore';
 import { useAlmacenStore } from '@/store/almacenStore';
 import { Card, StatCard } from '@/components/ui/Card';
 import { EstadoBadge, PrioridadBadge } from '@/components/ui/Badge';
-import { ROL_LABELS, formatDateShort } from '@/lib/utils';
+import { ROL_LABELS, formatDateOnly } from '@/lib/utils';
 import Link from 'next/link';
 import {
   ClipboardList,
@@ -183,7 +183,7 @@ export default function DashboardPage() {
                       </td>
                     )}
                     <td className="px-4 py-3.5 text-sm text-gray-500">
-                      {formatDateShort(req.fechaRequerida)}
+                      {formatDateOnly(req.fechaRequerida)}
                     </td>
                     <td className="px-6 py-3.5 text-right">
                       <Link

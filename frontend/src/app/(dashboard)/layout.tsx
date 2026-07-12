@@ -7,17 +7,17 @@ import Navbar from '@/components/layout/Navbar';
 import Sidebar from '@/components/layout/Sidebar';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated } = useAuthStore();
+  const { isAuthenticated, hasHydrated } = useAuthStore();
   const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   useEffect(() => {
-    if (!isAuthenticated) {
+    if (hasHydrated && !isAuthenticated) {
       router.push('/login');
     }
-  }, [isAuthenticated, router]);
+  }, [hasHydrated, isAuthenticated, router]);
 
-  if (!isAuthenticated) {
+  if (!hasHydrated || !isAuthenticated) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center">

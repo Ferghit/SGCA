@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { Suspense, useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuthStore } from '@/store/authStore';
 import api from '@/lib/api';
@@ -8,6 +8,14 @@ import { LoginResponse, User } from '@/types';
 import { Eye, EyeOff, Package, AlertCircle } from 'lucide-react';
 
 export default function LoginPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-gray-50" />}>
+      <LoginPageContent />
+    </Suspense>
+  );
+}
+
+function LoginPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const setAuth = useAuthStore((s) => s.setAuth);

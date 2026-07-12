@@ -14,6 +14,19 @@ import {
 export class ReportesService {
   constructor(private prisma: PrismaService) {}
 
+  private formatDateOnly(dateValue: Date | string): string {
+    const isoString = dateValue instanceof Date ? dateValue.toISOString() : String(dateValue);
+    const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(isoString);
+
+    if (match) {
+      const [, year, month, day] = match;
+      const utcDate = new Date(Date.UTC(Number(year), Number(month) - 1, Number(day), 12, 0, 0));
+      return utcDate.toLocaleDateString('es-PE', { timeZone: 'America/Lima' });
+    }
+
+    return new Date(dateValue).toLocaleDateString('es-PE');
+  }
+
   private formatStatus(status: string): string {
     const statusMap: Record<string, string> = {
       'PENDIENTE_APROBACION': 'Pendiente Aprobación',
@@ -28,7 +41,8 @@ export class ReportesService {
       'CANCELADA': 'Cancelada',
       'BORRADOR': 'Borrador',
       'PENDIENTE': 'Pendiente',
-      'APROBADO': 'Aprobado',
+      'APROBADO': 'Aprobado por Jefatura',
+      'APROBADO_GERENTE': 'Aprobado por Gerencia',
       'RECHAZADO': 'Rechazado'
     };
     return statusMap[status] || status;
@@ -45,12 +59,12 @@ export class ReportesService {
 
     const [pendientes, aprobados, rechazados] = await Promise.all([
       this.prisma.requerimiento.count({ where: { ...whereDates, estado: EstadoRequerimiento.PENDIENTE } }),
-      this.prisma.requerimiento.count({ where: { ...whereDates, estado: EstadoRequerimiento.APROBADO } }),
+        this.prisma.requerimiento.count({ where: { ...whereDates, estado: EstadoRequerimiento.APROBADO_GERENTE } }),
       this.prisma.requerimiento.count({ where: { ...whereDates, estado: EstadoRequerimiento.RECHAZADO } }),
     ]);
 
     const requerimientosAprobados = await this.prisma.requerimiento.findMany({
-      where: { ...whereDates, estado: EstadoRequerimiento.APROBADO },
+      where: { ...whereDates, estado: EstadoRequerimiento.APROBADO_GERENTE },
       include: { historial: { orderBy: { createdAt: 'asc' } } }
     });
 
@@ -58,7 +72,7 @@ export class ReportesService {
     if (requerimientosAprobados.length > 0) {
       const totalDias = requerimientosAprobados.reduce((sum, req) => {
         const primerHistorial = req.historial[0];
-        const aprobacionHistorial = req.historial.find(h => h.estadoNuevo === EstadoRequerimiento.APROBADO);
+        const aprobacionHistorial = req.historial.find(h => h.estadoNuevo === EstadoRequerimiento.APROBADO_GERENTE);
         if (primerHistorial && aprobacionHistorial) {
           const diffMs = aprobacionHistorial.createdAt.getTime() - primerHistorial.createdAt.getTime();
           const diffDias = diffMs / (1000 * 60 * 60 * 24);
@@ -642,7 +656,7 @@ export class ReportesService {
       item.codigo,
       `${item.solicitante?.nombre || '-'} ${item.solicitante?.apellido || ''}`,
       this.formatStatus(item.estado),
-      new Date(item.fechaRequerida).toLocaleDateString('es-PE')
+      this.formatDateOnly(item.fechaRequerida)
     ]);
     
     const buffer = await this.createPDFBuffer((doc) => {

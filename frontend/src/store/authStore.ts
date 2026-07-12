@@ -8,9 +8,11 @@ interface AuthState {
   user: Usuario | null;
   token: string | null;
   isAuthenticated: boolean;
+  hasHydrated: boolean;
   setAuth: (user: Usuario, token: string) => void;
   logout: () => void;
   updateUser: (user: Partial<Usuario>) => void;
+  setHasHydrated: (value: boolean) => void;
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -19,6 +21,7 @@ export const useAuthStore = create<AuthState>()(
       user: null,
       token: null,
       isAuthenticated: false,
+      hasHydrated: false,
 
       setAuth: (user: Usuario, token: string) => {
         if (typeof document !== 'undefined') {
@@ -40,6 +43,10 @@ export const useAuthStore = create<AuthState>()(
           set({ user: { ...current, ...partial } });
         }
       },
+
+      setHasHydrated: (value: boolean) => {
+        set({ hasHydrated: value });
+      },
     }),
     {
       name: 'sgca-auth',
@@ -48,6 +55,9 @@ export const useAuthStore = create<AuthState>()(
         token: state.token,
         isAuthenticated: state.isAuthenticated,
       }),
+      onRehydrateStorage: () => (state) => {
+        state?.setHasHydrated(true);
+      },
     },
   ),
 );

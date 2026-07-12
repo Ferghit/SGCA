@@ -20,6 +20,15 @@ export class AuthService {
   async login(dto: LoginDto) {
     const user = await this.prisma.usuario.findUnique({
       where: { email: dto.email },
+      select: {
+        id: true,
+        nombre: true,
+        apellido: true,
+        email: true,
+        password: true,
+        rol: true,
+        activo: true,
+      },
     });
 
     if (!user) {
@@ -53,6 +62,7 @@ export class AuthService {
   async register(dto: RegisterDto) {
     const exists = await this.prisma.usuario.findUnique({
       where: { email: dto.email },
+      select: { id: true },
     });
 
     if (exists) {

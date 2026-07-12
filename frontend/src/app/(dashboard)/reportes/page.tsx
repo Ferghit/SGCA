@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { Card, StatCard } from '@/components/ui/Card';
-import { formatDateShort } from '@/lib/utils';
+import { formatDateOnly, formatDateShort } from '@/lib/utils';
 import { reportesApi } from '@/lib/api';
 import {
   ClipboardList,
@@ -711,7 +711,7 @@ export default function ReportesPage() {
                           <td className="py-3 px-4 font-mono">{req.codigo}</td>
                           <td className="py-3 px-4">{req.solicitante?.nombre} {req.solicitante?.apellido}</td>
                           <td className="py-3 px-4">{req.estado}</td>
-                          <td className="py-3 px-4">{formatDateShort(req.fechaRequerida)}</td>
+                          <td className="py-3 px-4">{formatDateOnly(req.fechaRequerida)}</td>
                         </tr>
                       ))}
                     </tbody>
