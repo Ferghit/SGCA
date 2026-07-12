@@ -37,9 +37,9 @@ export class CotizacionesService {
       throw new NotFoundException('Requerimiento no encontrado');
     }
 
-    if (requerimiento.estado !== EstadoRequerimiento.APROBADO) {
+    if (requerimiento.estado !== EstadoRequerimiento.APROBADO_GERENTE) {
       throw new BadRequestException(
-        'Solo se pueden cotizar requerimientos en estado APROBADO',
+        'Solo se pueden cotizar requerimientos en estado APROBADO_GERENTE',
       );
     }
 
@@ -470,7 +470,7 @@ export class CotizacionesService {
   async getRequerimientosAprobados() {
     return this.prisma.requerimiento.findMany({
       where: {
-        estado: EstadoRequerimiento.APROBADO,
+        estado: EstadoRequerimiento.APROBADO_GERENTE,
         solicitudesCotizacion: { none: { estado: { in: [EstadoSolicitudCotizacion.ABIERTA, EstadoSolicitudCotizacion.CERRADA, EstadoSolicitudCotizacion.ADJUDICADA] } } },
       },
       include: {

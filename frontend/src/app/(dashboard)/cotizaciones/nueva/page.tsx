@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuthStore } from '@/store/authStore';
 import { useCotizacionesStore } from '@/store/cotizacionesStore';
 import api from '@/lib/api';
@@ -13,6 +13,7 @@ interface ItemForm { descripcion: string; cantidad: number; unidadMedida: string
 
 export default function NuevaSolicitudPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const user = useAuthStore((s) => s.user);
   const { crearSolicitud, isLoading, error } = useCotizacionesStore();
 
@@ -29,7 +30,17 @@ export default function NuevaSolicitudPage() {
   useEffect(() => {
     if (user?.rol !== 'ANALISTA_COMPRAS' && user?.rol !== 'ADMIN') router.push('/cotizaciones');
     api.get('/cotizaciones/requerimientos-aprobados').then(({ data }) => setRequerimientos(data));
-  }, [user]);
+  }, [router, user]);
+
+  useEffect(() => {
+    const preselectedId = searchParams.get('requerimientoId');
+    if (!preselectedId || requerimientos.length === 0) return;
+
+    const found = requerimientos.find((req) => req.id === Number(preselectedId));
+    if (found) {
+      handleSelectReq(preselectedId);
+    }
+  }, [requerimientos, searchParams]);
 
   // Pre-llenar items cuando selecciona un requerimiento
   const handleSelectReq = (id: string) => {
@@ -78,7 +89,7 @@ export default function NuevaSolicitudPage() {
         </Link>
         <div>
           <h1 className="page-title">Nueva Solicitud de Cotización</h1>
-          <p className="text-sm text-gray-500 mt-0.5">Publica una solicitud a partir de un requerimiento aprobado</p>
+          <p className="text-sm text-gray-500 mt-0.5">Publica una solicitud a partir de un requerimiento con aprobación gerencial</p>
         </div>
       </div>
 
@@ -87,7 +98,7 @@ export default function NuevaSolicitudPage() {
           <h2 className="font-semibold text-gray-800">Información General</h2>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Requerimiento Aprobado *</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Requerimiento Aprobado por Gerencia *</label>
             <select
               value={form.requerimientoId}
               onChange={(e) => handleSelectReq(e.target.value)}
@@ -101,7 +112,7 @@ export default function NuevaSolicitudPage() {
               ))}
             </select>
             {requerimientos.length === 0 && (
-              <p className="text-xs text-amber-600 mt-1">No hay requerimientos aprobados disponibles para cotizar</p>
+               <p className="text-xs text-amber-600 mt-1">No hay requerimientos con aprobación gerencial disponibles para cotizar</p>
             )}
           </div>
 

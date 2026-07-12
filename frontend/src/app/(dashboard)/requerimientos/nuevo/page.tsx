@@ -1,11 +1,21 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect, useMemo } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { useAuthStore } from '@/store/authStore';
 import { useRequerimientosStore } from '@/store/requerimientosStore';
-import { Producto, Prioridad } from '@/types';
+import { Producto, Prioridad, Requerimiento } from '@/types';
 import api from '@/lib/api';
-import { ArrowLeft, Plus, Trash2, AlertCircle, CheckCircle } from 'lucide-react';
+import { getDateInputValue, getLocalDateInputValue } from '@/lib/utils';
+import {
+  ArrowLeft,
+  Plus,
+  Trash2,
+  AlertCircle,
+  CheckCircle,
+  Send,
+  FilePenLine,
+} from 'lucide-react';
 import Link from 'next/link';
 
 interface DetalleForm {
@@ -14,6 +24,8 @@ interface DetalleForm {
   unidadMedida: string;
   observacion: string;
 }
+
+type SubmitAction = 'draft' | 'submit';
 
 const PRIORIDADES: { value: Prioridad; label: string; desc: string }[] = [
   { value: 'BAJA', label: 'Baja', desc: 'Sin urgencia' },
@@ -24,10 +36,22 @@ const PRIORIDADES: { value: Prioridad; label: string; desc: string }[] = [
 
 export default function NuevoRequerimientoPage() {
   const router = useRouter();
-  const { create, isLoading } = useRequerimientosStore();
+  const searchParams = useSearchParams();
+  const user = useAuthStore((s) => s.user);
+  const editId = Number(searchParams.get('edit'));
+  const isEditMode = Number.isFinite(editId) && editId > 0;
+
+  const {
+    create,
+    update,
+    enviarParaAprobacion,
+    isLoading,
+  } = useRequerimientosStore();
 
   const [productos, setProductos] = useState<Producto[]>([]);
   const [isLoadingProductos, setIsLoadingProductos] = useState(true);
+  const [isLoadingRequerimiento, setIsLoadingRequerimiento] = useState(isEditMode);
+  const [editableRequerimiento, setEditableRequerimiento] = useState<Requerimiento | null>(null);
   const [prioridad, setPrioridad] = useState<Prioridad>('MEDIA');
   const [fechaRequerida, setFechaRequerida] = useState('');
   const [descripcion, setDescripcion] = useState('');
@@ -36,6 +60,23 @@ export default function NuevoRequerimientoPage() {
   ]);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [submitAction, setSubmitAction] = useState<SubmitAction>('draft');
+
+  const latestObservation = useMemo(() => {
+    if (!editableRequerimiento) return '';
+
+    const historialObservacion = [...editableRequerimiento.historial]
+      .reverse()
+      .find((item) => item.estadoNuevo === 'EN_REVISION' && item.comentario?.trim());
+
+    return historialObservacion?.comentario || editableRequerimiento.comentarioJefe || '';
+  }, [editableRequerimiento]);
+
+  useEffect(() => {
+    if (user && !['TRABAJADOR', 'ADMIN'].includes(user.rol)) {
+      router.replace('/requerimientos');
+    }
+  }, [router, user]);
 
   useEffect(() => {
     const fetchProductos = async () => {
@@ -48,8 +89,44 @@ export default function NuevoRequerimientoPage() {
         setIsLoadingProductos(false);
       }
     };
+
     fetchProductos();
   }, []);
+
+  useEffect(() => {
+    const fetchRequerimiento = async () => {
+      if (!isEditMode) {
+        setIsLoadingRequerimiento(false);
+        return;
+      }
+
+      try {
+        const { data } = await api.get<Requerimiento>(`/requerimientos/${editId}`);
+        setEditableRequerimiento(data);
+        setPrioridad(data.prioridad);
+        setFechaRequerida(getDateInputValue(data.fechaRequerida));
+        setDescripcion(data.descripcion || '');
+        setDetalles(
+          data.detalles.map((detalle) => ({
+            productoId: detalle.productoId,
+            cantidad: Number(detalle.cantidad),
+            unidadMedida: detalle.unidadMedida,
+            observacion: detalle.observacion || '',
+          })),
+        );
+
+        if (!['BORRADOR', 'EN_REVISION'].includes(data.estado)) {
+          setError('Este requerimiento ya no se puede editar porque no está en BORRADOR ni EN_REVISION.');
+        }
+      } catch {
+        setError('No se pudo cargar el requerimiento para editar.');
+      } finally {
+        setIsLoadingRequerimiento(false);
+      }
+    };
+
+    fetchRequerimiento();
+  }, [editId, isEditMode]);
 
   const addDetalle = () => {
     setDetalles([...detalles, { productoId: 0, cantidad: 1, unidadMedida: '', observacion: '' }]);
@@ -69,66 +146,120 @@ export default function NuevoRequerimientoPage() {
         productoId: Number(value),
         unidadMedida: prod?.unidadMedida || updated[index].unidadMedida,
       };
+    } else if (field === 'cantidad') {
+      updated[index] = { ...updated[index], cantidad: Number(value) };
     } else {
       updated[index] = { ...updated[index], [field]: value };
     }
     setDetalles(updated);
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const buildPayload = () => ({
+    prioridad,
+    fechaRequerida,
+    descripcion: descripcion.trim() || undefined,
+    detalles: detalles.map((d) => ({
+      productoId: d.productoId,
+      cantidad: Number(d.cantidad),
+      unidadMedida: d.unidadMedida,
+      observacion: d.observacion.trim() || undefined,
+    })),
+  });
+
+  const handleSubmit = async (action: SubmitAction) => {
+    setSubmitAction(action);
     setError('');
     setSuccess('');
 
-    if (!fechaRequerida) return setError('La fecha requerida es obligatoria.');
-    if (productos.length === 0) {
-      return setError('No hay productos activos disponibles para generar el requerimiento.');
+    if (!fechaRequerida) {
+      setError('La fecha requerida es obligatoria.');
+      return;
     }
+
+    if (productos.length === 0) {
+      setError('No hay productos activos disponibles para generar el requerimiento.');
+      return;
+    }
+
     if (detalles.some((d) => !d.productoId || !d.unidadMedida || d.cantidad <= 0)) {
-      return setError('Completa todos los campos de los productos (producto, cantidad y unidad de medida).');
+      setError('Completa todos los campos de los productos (producto, cantidad y unidad de medida).');
+      return;
+    }
+
+    if (isEditMode && editableRequerimiento && !['BORRADOR', 'EN_REVISION'].includes(editableRequerimiento.estado)) {
+      setError('Este requerimiento ya no se puede editar.');
+      return;
     }
 
     try {
-      const result = await create({
-        prioridad,
-        fechaRequerida,
-        descripcion: descripcion.trim() || undefined,
-        detalles: detalles.map((d) => ({
-          productoId: d.productoId,
-          cantidad: Number(d.cantidad),
-          unidadMedida: d.unidadMedida,
-          observacion: d.observacion || undefined,
-        })),
-      });
+      const payload = buildPayload();
+      const result = isEditMode && editableRequerimiento
+        ? await update(editableRequerimiento.id, payload)
+        : await create(payload);
 
-      setSuccess(`Requerimiento ${(result as {codigo: string}).codigo} creado exitosamente.`);
-      setTimeout(() => router.push('/requerimientos'), 1500);
+      if (action === 'submit') {
+        await enviarParaAprobacion(result.id);
+      }
+
+      const actionLabel =
+        action === 'submit'
+          ? isEditMode
+            ? 'actualizado y enviado a aprobación'
+            : 'creado y enviado a aprobación'
+          : isEditMode
+            ? 'actualizado exitosamente'
+            : 'creado exitosamente';
+
+      setSuccess(`Requerimiento ${result.codigo} ${actionLabel}.`);
+      setTimeout(() => router.push(`/requerimientos/${result.id}`), 1200);
     } catch (err: unknown) {
       const e = err as Error;
-      setError(e.message || 'Error al crear el requerimiento.');
+      setError(e.message || 'Error al guardar el requerimiento.');
     }
   };
 
+  if (isLoadingRequerimiento) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <div
+          className="w-8 h-8 border-4 border-t-transparent rounded-full animate-spin"
+          style={{ borderColor: '#006D77', borderTopColor: 'transparent' }}
+        />
+      </div>
+    );
+  }
+
+  const disableForm =
+    isLoading ||
+    isLoadingProductos ||
+    productos.length === 0 ||
+    (isEditMode && !!editableRequerimiento && !['BORRADOR', 'EN_REVISION'].includes(editableRequerimiento.estado));
+
   return (
     <div className="max-w-3xl mx-auto space-y-5">
-      {/* Header */}
       <div className="flex items-center gap-3">
         <Link href="/requerimientos" className="p-2 rounded-lg hover:bg-gray-100 transition-colors">
           <ArrowLeft className="w-5 h-5 text-gray-500" />
         </Link>
         <div>
-          <h1 className="page-title">Nuevo Requerimiento</h1>
-          <p className="text-sm text-gray-500 mt-0.5">Solicita materiales o equipos para tu area</p>
+          <h1 className="page-title">
+            {isEditMode ? 'Editar Requerimiento' : 'Nuevo Requerimiento'}
+          </h1>
+          <p className="text-sm text-gray-500 mt-0.5">
+            {isEditMode
+              ? 'Actualiza el contenido antes de guardarlo o reenviarlo'
+              : 'Solicita materiales o equipos para tu area'}
+          </p>
         </div>
       </div>
 
-      {/* Alertas */}
       {error && (
         <div className="p-4 bg-red-50 border border-red-200 rounded-xl flex items-start gap-3">
           <AlertCircle className="w-5 h-5 text-red-500 mt-0.5 flex-shrink-0" />
           <p className="text-sm text-red-700">{error}</p>
         </div>
       )}
+
       {success && (
         <div className="p-4 bg-green-50 border border-green-200 rounded-xl flex items-start gap-3">
           <CheckCircle className="w-5 h-5 text-green-500 mt-0.5 flex-shrink-0" />
@@ -136,14 +267,24 @@ export default function NuevoRequerimientoPage() {
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="space-y-5">
-        {/* Informacion general */}
+      {isEditMode && editableRequerimiento?.estado === 'EN_REVISION' && latestObservation && (
+        <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl flex items-start gap-3">
+          <FilePenLine className="w-5 h-5 text-amber-600 mt-0.5 flex-shrink-0" />
+          <div>
+            <p className="text-sm font-semibold text-amber-800">Observaciones pendientes</p>
+            <p className="text-sm text-amber-700 mt-1">{latestObservation}</p>
+          </div>
+        </div>
+      )}
+
+      <div className="space-y-5">
         <div className="bg-white rounded-xl border border-gray-100 shadow-card p-6 space-y-4">
           <h2 className="section-title">Informacion General</h2>
 
-          {/* Prioridad */}
           <div>
-            <label className="label-field">Prioridad del Requerimiento <span className="text-red-500">*</span></label>
+            <label className="label-field">
+              Prioridad del Requerimiento <span className="text-red-500">*</span>
+            </label>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-1">
               {PRIORIDADES.map((p) => (
                 <button
@@ -155,7 +296,11 @@ export default function NuevoRequerimientoPage() {
                       ? 'border-secondary-DEFAULT bg-secondary-50'
                       : 'border-gray-200 hover:border-gray-300'
                   }`}
-                  style={prioridad === p.value ? { borderColor: '#006D77', backgroundColor: '#E0F2F3' } : {}}
+                  style={
+                    prioridad === p.value
+                      ? { borderColor: '#006D77', backgroundColor: '#E0F2F3' }
+                      : {}
+                  }
                 >
                   <p className="font-semibold text-sm text-primary-DEFAULT">{p.label}</p>
                   <p className="text-xs text-gray-500 mt-0.5">{p.desc}</p>
@@ -164,13 +309,14 @@ export default function NuevoRequerimientoPage() {
             </div>
           </div>
 
-          {/* Fecha requerida */}
           <div>
-            <label className="label-field">Fecha Requerida <span className="text-red-500">*</span></label>
+            <label className="label-field">
+              Fecha Requerida <span className="text-red-500">*</span>
+            </label>
             <input
               type="date"
               value={fechaRequerida}
-              min={new Date().toISOString().split('T')[0]}
+              min={getLocalDateInputValue()}
               onChange={(e) => setFechaRequerida(e.target.value)}
               className="input-field max-w-xs"
               required
@@ -178,7 +324,6 @@ export default function NuevoRequerimientoPage() {
             <p className="text-xs text-gray-400 mt-1">Fecha en que necesitas los materiales</p>
           </div>
 
-          {/* Descripcion */}
           <div>
             <label className="label-field">Descripcion / Justificacion</label>
             <textarea
@@ -193,7 +338,6 @@ export default function NuevoRequerimientoPage() {
           </div>
         </div>
 
-        {/* Productos solicitados */}
         <div className="bg-white rounded-xl border border-gray-100 shadow-card p-6 space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="section-title">Productos Solicitados</h2>
@@ -236,7 +380,9 @@ export default function NuevoRequerimientoPage() {
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="sm:col-span-2">
-                    <label className="label-field">Producto <span className="text-red-500">*</span></label>
+                    <label className="label-field">
+                      Producto <span className="text-red-500">*</span>
+                    </label>
                     <select
                       value={det.productoId || ''}
                       onChange={(e) => updateDetalle(index, 'productoId', e.target.value)}
@@ -253,7 +399,9 @@ export default function NuevoRequerimientoPage() {
                   </div>
 
                   <div>
-                    <label className="label-field">Cantidad <span className="text-red-500">*</span></label>
+                    <label className="label-field">
+                      Cantidad <span className="text-red-500">*</span>
+                    </label>
                     <input
                       type="number"
                       min="0.01"
@@ -266,7 +414,9 @@ export default function NuevoRequerimientoPage() {
                   </div>
 
                   <div>
-                    <label className="label-field">Unidad de Medida <span className="text-red-500">*</span></label>
+                    <label className="label-field">
+                      Unidad de Medida <span className="text-red-500">*</span>
+                    </label>
                     <input
                       type="text"
                       value={det.unidadMedida}
@@ -293,21 +443,38 @@ export default function NuevoRequerimientoPage() {
           </div>
         </div>
 
-        {/* Acciones */}
         <div className="flex items-center justify-end gap-3 pb-6">
           <Link href="/requerimientos" className="btn-secondary">
             Cancelar
           </Link>
           <button
-            type="submit"
-            disabled={isLoading || isLoadingProductos || productos.length === 0}
-            className="px-6 py-2.5 rounded-lg text-white font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            style={{ backgroundColor: isLoading ? '#ccc' : '#006D77' }}
+            type="button"
+            onClick={() => handleSubmit('draft')}
+            disabled={disableForm}
+            className="px-6 py-2.5 rounded-lg border border-gray-200 text-gray-700 font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {isLoading ? 'Guardando...' : 'Guardar como Borrador'}
+            {isLoading && submitAction === 'draft'
+              ? isEditMode
+                ? 'Guardando cambios...'
+                : 'Guardando...'
+              : isEditMode
+                ? 'Guardar cambios'
+                : 'Guardar como Borrador'}
+          </button>
+          <button
+            type="button"
+            onClick={() => handleSubmit('submit')}
+            disabled={disableForm}
+            className="px-6 py-2.5 rounded-lg text-white font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+            style={{ backgroundColor: '#006D77' }}
+          >
+            <Send className="w-4 h-4" />
+            {isLoading && submitAction === 'submit'
+              ? 'Procesando...'
+              : 'Guardar y enviar a aprobacion'}
           </button>
         </div>
-      </form>
+      </div>
     </div>
   );
 }

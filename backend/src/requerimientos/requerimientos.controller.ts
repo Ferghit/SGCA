@@ -8,10 +8,10 @@ import {
   ParseIntPipe,
   UseGuards,
   Request,
-  Query,
 } from '@nestjs/common';
 import { RequerimientosService } from './requerimientos.service';
 import { CreateRequerimientoDto } from './dto/create-requerimiento.dto';
+import { UpdateRequerimientoDto } from './dto/update-requerimiento.dto';
 import { UpdateEstadoDto } from './dto/update-estado.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
@@ -23,12 +23,13 @@ import { Rol } from '@prisma/client';
 export class RequerimientosController {
   constructor(private service: RequerimientosService) {}
 
-  @Roles(Rol.TRABAJADOR, Rol.ADMIN, Rol.ANALISTA_COMPRAS)
+  @Roles(Rol.TRABAJADOR, Rol.ADMIN)
   @Post()
   create(@Body() dto: CreateRequerimientoDto, @Request() req: any) {
     return this.service.create(dto, req.user.id);
   }
 
+  @Roles(Rol.TRABAJADOR, Rol.ADMIN, Rol.JEFE_AREA, Rol.GERENTE, Rol.ANALISTA_COMPRAS)
   @Get()
   findAll(@Request() req: any) {
     return this.service.findAll(req.user.id, req.user.rol);
@@ -36,8 +37,8 @@ export class RequerimientosController {
 
   @Roles(Rol.JEFE_AREA, Rol.ADMIN, Rol.GERENTE, Rol.ANALISTA_COMPRAS)
   @Get('pendientes')
-  findPendientes() {
-    return this.service.findPendientes();
+  findPendientes(@Request() req: any) {
+    return this.service.findPendientes(req.user.id, req.user.rol);
   }
 
   @Get('estadisticas/mis-requerimientos')
@@ -51,9 +52,20 @@ export class RequerimientosController {
     return this.service.getEstadisticasJefe();
   }
 
+  @Roles(Rol.TRABAJADOR, Rol.ADMIN, Rol.JEFE_AREA, Rol.GERENTE, Rol.ANALISTA_COMPRAS)
   @Get(':id')
-  findOne(@Param('id', ParseIntPipe) id: number) {
-    return this.service.findOne(id);
+  findOne(@Param('id', ParseIntPipe) id: number, @Request() req: any) {
+    return this.service.findOne(id, req.user.id, req.user.rol);
+  }
+
+  @Roles(Rol.TRABAJADOR, Rol.ADMIN)
+  @Patch(':id')
+  update(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: UpdateRequerimientoDto,
+    @Request() req: any,
+  ) {
+    return this.service.update(id, dto, req.user.id, req.user.rol);
   }
 
   @Roles(Rol.TRABAJADOR, Rol.ADMIN)
@@ -62,6 +74,7 @@ export class RequerimientosController {
     return this.service.submitParaAprobacion(id, req.user.id);
   }
 
+  @Roles(Rol.JEFE_AREA, Rol.GERENTE, Rol.ADMIN)
   @Patch(':id/estado')
   updateEstado(
     @Param('id', ParseIntPipe) id: number,

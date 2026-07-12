@@ -8,6 +8,42 @@ export function formatDate(dateString: string): string {
   });
 }
 
+export function formatDateOnly(dateString: string): string {
+  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(dateString);
+
+  if (match) {
+    const [, year, month, day] = match;
+    const utcDate = new Date(Date.UTC(Number(year), Number(month) - 1, Number(day), 12, 0, 0));
+
+    return utcDate.toLocaleDateString('es-PE', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      timeZone: 'America/Lima',
+    });
+  }
+
+  return formatDate(dateString);
+}
+
+export function getLocalDateInputValue(baseDate = new Date()): string {
+  const year = baseDate.getFullYear();
+  const month = String(baseDate.getMonth() + 1).padStart(2, '0');
+  const day = String(baseDate.getDate()).padStart(2, '0');
+
+  return `${year}-${month}-${day}`;
+}
+
+export function getDateInputValue(dateString: string): string {
+  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(dateString);
+
+  if (match) {
+    return `${match[1]}-${match[2]}-${match[3]}`;
+  }
+
+  return getLocalDateInputValue(new Date(dateString));
+}
+
 export function formatDateShort(dateStr: string): string {
   return new Date(dateStr).toLocaleDateString('es-PE', {
     year: 'numeric', 
@@ -52,7 +88,13 @@ export const ESTADO_CONFIG: Record<
     borderColor: 'border-amber-300',
   },
   APROBADO: {
-    label: 'Aprobado',
+    label: 'Aprobado por Jefatura',
+    color: 'text-teal-700',
+    bgColor: 'bg-teal-50',
+    borderColor: 'border-teal-300',
+  },
+  APROBADO_GERENTE: {
+    label: 'Aprobado por Gerencia',
     color: 'text-green-700',
     bgColor: 'bg-green-50',
     borderColor: 'border-green-300',

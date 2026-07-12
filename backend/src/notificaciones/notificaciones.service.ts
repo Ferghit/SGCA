@@ -5,6 +5,7 @@ interface CrearNotificacionDto {
   emisorId?: number;
   receptorId: number;
   requerimientoId?: number;
+  ordenCompraId?: number;
   titulo: string;
   mensaje: string;
 }
@@ -13,14 +14,35 @@ interface CrearNotificacionDto {
 export class NotificacionesService {
   constructor(private prisma: PrismaService) {}
 
+  private getBaseSelect() {
+    return {
+      id: true,
+      emisorId: true,
+      receptorId: true,
+      requerimientoId: true,
+      titulo: true,
+      mensaje: true,
+      leida: true,
+      createdAt: true,
+    } as const;
+  }
+
   async crear(data: CrearNotificacionDto) {
-    return this.prisma.notificacion.create({ data });
+    // La tabla real `notificaciones` aún no tiene `ordenCompraId`.
+    // Evitamos que Prisma intente leer/escribir esa columna hasta que la BD se alinee.
+    const { ordenCompraId: _omitOrdenCompraId, ...safeData } = data;
+
+    return this.prisma.notificacion.create({
+      data: safeData,
+      select: this.getBaseSelect(),
+    });
   }
 
   async findByUsuario(userId: number) {
     return this.prisma.notificacion.findMany({
       where: { receptorId: userId },
-      include: {
+      select: {
+        ...this.getBaseSelect(),
         emisor: { select: { id: true, nombre: true, apellido: true } },
         requerimiento: { select: { id: true, codigo: true } },
       },

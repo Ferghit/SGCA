@@ -7,6 +7,7 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificacionesService } from '../notificaciones/notificaciones.service';
 import { CreateRequerimientoDto } from './dto/create-requerimiento.dto';
+import { UpdateRequerimientoDto } from './dto/update-requerimiento.dto';
 import { UpdateEstadoDto } from './dto/update-estado.dto';
 import { EstadoRequerimiento, Rol } from '@prisma/client';
 
@@ -31,24 +32,161 @@ export class RequerimientosService {
     return `REQ-${year}-${String(siguiente).padStart(3, '0')}`;
   }
 
+  private getRequerimientoInclude() {
+    return {
+      solicitante: {
+        select: { id: true, nombre: true, apellido: true, email: true, rol: true },
+      },
+      aprobador: { select: { id: true, nombre: true, apellido: true } },
+      detalles: { include: { producto: true } },
+      historial: { orderBy: { createdAt: 'asc' as const } },
+    };
+  }
+
+  private parseDateOnly(dateValue: string): Date {
+    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateValue);
+
+    if (!match) {
+      return new Date(dateValue);
+    }
+
+    const [, year, month, day] = match;
+
+    // Guardamos al mediodía UTC para evitar desfases de huso horario
+    // cuando el frontend representa un valor semántico de solo fecha.
+    return new Date(Date.UTC(Number(year), Number(month) - 1, Number(day), 12, 0, 0));
+  }
+
+  private mapRequerimientoData(dto: CreateRequerimientoDto | UpdateRequerimientoDto) {
+    return {
+      prioridad: dto.prioridad,
+      fechaRequerida: this.parseDateOnly(dto.fechaRequerida),
+      descripcion: dto.descripcion?.trim() || null,
+      detalles: dto.detalles.map((d) => ({
+        productoId: d.productoId,
+        cantidad: d.cantidad,
+        unidadMedida: d.unidadMedida,
+        observacion: d.observacion?.trim() || null,
+      })),
+    };
+  }
+
+  private getWhereByRol(userId: number, rol: string) {
+    switch (rol) {
+      case Rol.ADMIN:
+        return {};
+      case Rol.TRABAJADOR:
+        return { solicitanteId: userId };
+      case Rol.JEFE_AREA:
+        // Nota: hoy no existe relación de área en el modelo. Filtramos por etapa del flujo.
+        return {
+          estado: {
+            in: [
+              EstadoRequerimiento.PENDIENTE,
+              EstadoRequerimiento.APROBADO,
+              EstadoRequerimiento.EN_REVISION,
+              EstadoRequerimiento.RECHAZADO,
+            ],
+          },
+        };
+      case Rol.GERENTE:
+        return { estado: EstadoRequerimiento.APROBADO };
+      case Rol.ANALISTA_COMPRAS:
+        return { estado: EstadoRequerimiento.APROBADO_GERENTE };
+      default:
+        throw new ForbiddenException('No tiene permiso para acceder a requerimientos');
+    }
+  }
+
+  private getPendientesWhereByRol(rol: string) {
+    switch (rol) {
+      case Rol.ADMIN:
+        return {
+          estado: {
+            in: [
+              EstadoRequerimiento.PENDIENTE,
+              EstadoRequerimiento.APROBADO,
+              EstadoRequerimiento.APROBADO_GERENTE,
+            ],
+          },
+        };
+      case Rol.JEFE_AREA:
+        return { estado: EstadoRequerimiento.PENDIENTE };
+      case Rol.GERENTE:
+        return { estado: EstadoRequerimiento.APROBADO };
+      case Rol.ANALISTA_COMPRAS:
+        return { estado: EstadoRequerimiento.APROBADO_GERENTE };
+      default:
+        throw new ForbiddenException('No tiene permiso para consultar esta bandeja');
+    }
+  }
+
+  private assertCanAccess(req: any, userId: number, rol: string) {
+    if (rol === Rol.ADMIN) return;
+
+    if (rol === Rol.TRABAJADOR) {
+      if (req.solicitanteId !== userId) {
+        throw new ForbiddenException('Solo puede acceder a sus propios requerimientos');
+      }
+      return;
+    }
+
+    if (rol === Rol.GERENTE) {
+      if (
+        [
+          EstadoRequerimiento.APROBADO,
+          EstadoRequerimiento.APROBADO_GERENTE,
+          EstadoRequerimiento.EN_REVISION,
+        ].includes(req.estado)
+      ) {
+        return;
+      }
+
+      throw new ForbiddenException('No tiene permiso para acceder a este requerimiento');
+    }
+
+    if (rol === Rol.PROVEEDOR) {
+      throw new ForbiddenException('El proveedor no puede acceder a requerimientos');
+    }
+
+    const where = this.getWhereByRol(userId, rol);
+
+    if (where && 'solicitanteId' in where && where.solicitanteId !== req.solicitanteId) {
+      throw new ForbiddenException('No tiene permiso para acceder a este requerimiento');
+    }
+
+    if (
+      where &&
+      'estado' in where &&
+      where.estado &&
+      typeof where.estado === 'object' &&
+      'in' in where.estado
+    ) {
+      if (!where.estado.in.includes(req.estado)) {
+        throw new ForbiddenException('No tiene permiso para acceder a este requerimiento');
+      }
+      return;
+    }
+
+    if (where && 'estado' in where && req.estado !== where.estado) {
+      throw new ForbiddenException('No tiene permiso para acceder a este requerimiento');
+    }
+  }
+
   async create(dto: CreateRequerimientoDto, userId: number) {
     const codigo = await this.generarCodigo();
+    const payload = this.mapRequerimientoData(dto);
 
-    const requerimiento = await this.prisma.requerimiento.create({
+    return this.prisma.requerimiento.create({
       data: {
         codigo,
         solicitanteId: userId,
-        prioridad: dto.prioridad,
-        fechaRequerida: new Date(dto.fechaRequerida),
-        descripcion: dto.descripcion,
+        prioridad: payload.prioridad,
+        fechaRequerida: payload.fechaRequerida,
+        descripcion: payload.descripcion,
         estado: EstadoRequerimiento.BORRADOR,
         detalles: {
-          create: dto.detalles.map((d) => ({
-            productoId: d.productoId,
-            cantidad: d.cantidad,
-            unidadMedida: d.unidadMedida,
-            observacion: d.observacion,
-          })),
+          create: payload.detalles,
         },
         historial: {
           create: [
@@ -60,70 +198,116 @@ export class RequerimientosService {
           ],
         },
       },
-      include: {
-        detalles: { include: { producto: true } },
-        solicitante: { select: { id: true, nombre: true, apellido: true, rol: true } },
-        historial: { orderBy: { createdAt: 'asc' } },
-      },
+      include: this.getRequerimientoInclude(),
+    });
+  }
+
+  async update(id: number, dto: UpdateRequerimientoDto, userId: number, rol: string) {
+    const req = await this.prisma.requerimiento.findUnique({
+      where: { id },
+      include: this.getRequerimientoInclude(),
     });
 
-    return requerimiento;
+    if (!req) throw new NotFoundException(`Requerimiento #${id} no encontrado`);
+
+    if (rol !== Rol.TRABAJADOR && rol !== Rol.ADMIN) {
+      throw new ForbiddenException('No tiene permiso para editar requerimientos');
+    }
+
+    if (rol === Rol.TRABAJADOR && req.solicitanteId !== userId) {
+      throw new ForbiddenException('Solo puede editar sus propios requerimientos');
+    }
+
+    if (
+      req.estado !== EstadoRequerimiento.BORRADOR &&
+      req.estado !== EstadoRequerimiento.EN_REVISION
+    ) {
+      throw new BadRequestException(
+        'Solo se pueden editar requerimientos en estado BORRADOR o EN_REVISION',
+      );
+    }
+
+    const payload = this.mapRequerimientoData(dto);
+
+    return this.prisma.requerimiento.update({
+      where: { id },
+      data: {
+        prioridad: payload.prioridad,
+        fechaRequerida: payload.fechaRequerida,
+        descripcion: payload.descripcion,
+        detalles: {
+          deleteMany: {},
+          create: payload.detalles,
+        },
+        historial: {
+          create: {
+            estadoAnterior: req.estado,
+            estadoNuevo: req.estado,
+            usuarioId: userId,
+            comentario:
+              req.estado === EstadoRequerimiento.EN_REVISION
+                ? 'Requerimiento corregido tras observaciones'
+                : 'Requerimiento actualizado en borrador',
+          },
+        },
+      },
+      include: this.getRequerimientoInclude(),
+    });
   }
 
   async findAll(userId: number, rol: string) {
-    const where: any = {};
-
-    if (rol === Rol.TRABAJADOR) {
-      where.solicitanteId = userId;
-    }
+    const where = this.getWhereByRol(userId, rol);
 
     return this.prisma.requerimiento.findMany({
       where,
-      include: {
-        solicitante: { select: { id: true, nombre: true, apellido: true } },
-        aprobador: { select: { id: true, nombre: true, apellido: true } },
-        detalles: { include: { producto: true } },
-        historial: { orderBy: { createdAt: 'asc' } },
-      },
+      include: this.getRequerimientoInclude(),
       orderBy: [{ prioridad: 'desc' }, { createdAt: 'desc' }],
     });
   }
 
-  async findPendientes() {
+  async findPendientes(userId: number, rol: string) {
+    const where = this.getPendientesWhereByRol(rol);
+
+    if (rol === Rol.TRABAJADOR) {
+      throw new ForbiddenException('No tiene permiso para acceder a esta bandeja');
+    }
+
     return this.prisma.requerimiento.findMany({
-      where: { estado: EstadoRequerimiento.PENDIENTE },
-      include: {
-        solicitante: { select: { id: true, nombre: true, apellido: true } },
-        detalles: { include: { producto: true } },
-      },
+      where,
+      include: this.getRequerimientoInclude(),
       orderBy: [{ prioridad: 'desc' }, { createdAt: 'asc' }],
     });
   }
 
-  async findOne(id: number) {
+  async findOne(id: number, userId: number, rol: string) {
     const req = await this.prisma.requerimiento.findUnique({
       where: { id },
-      include: {
-        solicitante: { select: { id: true, nombre: true, apellido: true, email: true } },
-        aprobador: { select: { id: true, nombre: true, apellido: true } },
-        detalles: { include: { producto: true } },
-        historial: { orderBy: { createdAt: 'asc' } },
-      },
+      include: this.getRequerimientoInclude(),
     });
 
     if (!req) throw new NotFoundException(`Requerimiento #${id} no encontrado`);
+
+    this.assertCanAccess(req, userId, rol);
 
     return req;
   }
 
   async submitParaAprobacion(id: number, userId: number) {
-    const req = await this.findOne(id);
+    const req = await this.prisma.requerimiento.findUnique({
+      where: { id },
+      include: this.getRequerimientoInclude(),
+    });
+
+    if (!req) throw new NotFoundException(`Requerimiento #${id} no encontrado`);
 
     if (req.solicitanteId !== userId) {
       throw new ForbiddenException('Solo el solicitante puede enviar este requerimiento');
     }
 
-    if (req.estado !== EstadoRequerimiento.BORRADOR && req.estado !== EstadoRequerimiento.EN_REVISION) {
+    if (
+      req.estado !== EstadoRequerimiento.BORRADOR &&
+      req.estado !== EstadoRequerimiento.EN_REVISION
+    ) {
       throw new BadRequestException(
         'Solo se puede enviar a aprobacion un requerimiento en estado BORRADOR o EN_REVISION',
       );
@@ -133,6 +317,7 @@ export class RequerimientosService {
       where: { id },
       data: {
         estado: EstadoRequerimiento.PENDIENTE,
+        comentarioJefe: null,
         historial: {
           create: {
             estadoAnterior: req.estado,
@@ -142,16 +327,12 @@ export class RequerimientosService {
           },
         },
       },
-      include: {
-        solicitante: { select: { id: true, nombre: true, apellido: true } },
-        detalles: { include: { producto: true } },
-        historial: { orderBy: { createdAt: 'asc' } },
-      },
+      include: this.getRequerimientoInclude(),
     });
 
-    // Notificar a todos los jefes de area
     const jefes = await this.prisma.usuario.findMany({
       where: { rol: Rol.JEFE_AREA, activo: true },
+      select: { id: true },
     });
 
     for (const jefe of jefes) {
@@ -168,31 +349,12 @@ export class RequerimientosService {
   }
 
   async updateEstado(id: number, dto: UpdateEstadoDto, userId: number, rol: string) {
-    const req = await this.findOne(id);
+    const req = await this.prisma.requerimiento.findUnique({
+      where: { id },
+      include: this.getRequerimientoInclude(),
+    });
 
-    // Validar permisos por rol y estado
-    if (rol === Rol.JEFE_AREA) {
-      const estadosPermitidos: EstadoRequerimiento[] = [
-        EstadoRequerimiento.APROBADO,
-        EstadoRequerimiento.RECHAZADO,
-        EstadoRequerimiento.EN_REVISION,
-      ];
-      if (!estadosPermitidos.includes(dto.estado)) {
-        throw new ForbiddenException('El Jefe de Area solo puede APROBAR, RECHAZAR o solicitar EN_REVISION');
-      }
-      if (req.estado !== EstadoRequerimiento.PENDIENTE) {
-        throw new BadRequestException('Solo se pueden procesar requerimientos en estado PENDIENTE');
-      }
-    } else if (rol === Rol.TRABAJADOR) {
-      if (req.solicitanteId !== userId) {
-        throw new ForbiddenException('No tiene permiso para modificar este requerimiento');
-      }
-    } else {
-      const rolesConAccesoTotal: Rol[] = [Rol.ADMIN, Rol.GERENTE, Rol.ANALISTA_COMPRAS];
-      if (!rolesConAccesoTotal.includes(rol as Rol)) {
-        throw new ForbiddenException('No tiene permiso para cambiar el estado de requerimientos');
-      }
-    }
+    if (!req) throw new NotFoundException(`Requerimiento #${id} no encontrado`);
 
     const dataUpdate: any = {
       estado: dto.estado,
@@ -206,25 +368,50 @@ export class RequerimientosService {
       },
     };
 
-    if (rol === Rol.JEFE_AREA) {
+    if ((rol === Rol.JEFE_AREA || rol === Rol.ADMIN) && req.estado === EstadoRequerimiento.PENDIENTE) {
+      const estadosPermitidos: EstadoRequerimiento[] = [
+        EstadoRequerimiento.APROBADO,
+        EstadoRequerimiento.RECHAZADO,
+        EstadoRequerimiento.EN_REVISION,
+      ];
+
+      if (!estadosPermitidos.includes(dto.estado)) {
+        throw new ForbiddenException(
+          'El Jefe de Area solo puede aprobar, rechazar o solicitar correccion',
+        );
+      }
+
       dataUpdate.aprobadorId = userId;
-      dataUpdate.comentarioJefe = dto.comentario;
+      dataUpdate.comentarioJefe = dto.comentario?.trim() || null;
+    } else if (
+      (rol === Rol.GERENTE || rol === Rol.ADMIN) &&
+      req.estado === EstadoRequerimiento.APROBADO
+    ) {
+      const estadosPermitidos: EstadoRequerimiento[] = [
+        EstadoRequerimiento.APROBADO_GERENTE,
+        EstadoRequerimiento.EN_REVISION,
+      ];
+
+      if (!estadosPermitidos.includes(dto.estado)) {
+        throw new ForbiddenException(
+          'El Gerente solo puede aprobar gerencialmente o devolver a observaciones',
+        );
+      }
+
+      dataUpdate.comentarioJefe = dto.comentario?.trim() || null;
+    } else {
+      throw new ForbiddenException('No tiene permiso para cambiar el estado de este requerimiento');
     }
 
     const actualizado = await this.prisma.requerimiento.update({
       where: { id },
       data: dataUpdate,
-      include: {
-        solicitante: { select: { id: true, nombre: true, apellido: true } },
-        aprobador: { select: { id: true, nombre: true, apellido: true } },
-        detalles: { include: { producto: true } },
-        historial: { orderBy: { createdAt: 'asc' } },
-      },
+      include: this.getRequerimientoInclude(),
     });
 
-    // Notificar al solicitante del cambio de estado
     const estadoLabel = {
-      [EstadoRequerimiento.APROBADO]: 'aprobado',
+      [EstadoRequerimiento.APROBADO]: 'aprobado por jefe de área y enviado a gerencia',
+      [EstadoRequerimiento.APROBADO_GERENTE]: 'aprobado por gerencia',
       [EstadoRequerimiento.RECHAZADO]: 'rechazado',
       [EstadoRequerimiento.EN_REVISION]: 'devuelto para correccion',
       [EstadoRequerimiento.PENDIENTE]: 'enviado a revision',
@@ -241,6 +428,23 @@ export class RequerimientosService {
         : `Su requerimiento ${req.codigo} ha sido ${estadoLabel[dto.estado]}.`,
     });
 
+    if (dto.estado === EstadoRequerimiento.APROBADO) {
+      const gerentes = await this.prisma.usuario.findMany({
+        where: { rol: Rol.GERENTE, activo: true },
+        select: { id: true },
+      });
+
+      for (const gerente of gerentes) {
+        await this.notificacionesService.crear({
+          emisorId: userId,
+          receptorId: gerente.id,
+          requerimientoId: id,
+          titulo: `Aprobación gerencial pendiente: ${req.codigo}`,
+          mensaje: `El requerimiento ${req.codigo} ya fue aprobado por Jefatura y está pendiente de su aprobación gerencial.`,
+        });
+      }
+    }
+
     return actualizado;
   }
 
@@ -248,11 +452,29 @@ export class RequerimientosService {
     const [total, borrador, pendiente, aprobado, rechazado, enRevision] =
       await Promise.all([
         this.prisma.requerimiento.count({ where: { solicitanteId: userId } }),
-        this.prisma.requerimiento.count({ where: { solicitanteId: userId, estado: EstadoRequerimiento.BORRADOR } }),
-        this.prisma.requerimiento.count({ where: { solicitanteId: userId, estado: EstadoRequerimiento.PENDIENTE } }),
-        this.prisma.requerimiento.count({ where: { solicitanteId: userId, estado: EstadoRequerimiento.APROBADO } }),
-        this.prisma.requerimiento.count({ where: { solicitanteId: userId, estado: EstadoRequerimiento.RECHAZADO } }),
-        this.prisma.requerimiento.count({ where: { solicitanteId: userId, estado: EstadoRequerimiento.EN_REVISION } }),
+        this.prisma.requerimiento.count({
+          where: { solicitanteId: userId, estado: EstadoRequerimiento.BORRADOR },
+        }),
+        this.prisma.requerimiento.count({
+          where: { solicitanteId: userId, estado: EstadoRequerimiento.PENDIENTE },
+        }),
+        this.prisma.requerimiento.count({
+          where: {
+            solicitanteId: userId,
+            estado: {
+              in: [
+                EstadoRequerimiento.APROBADO,
+                EstadoRequerimiento.APROBADO_GERENTE,
+              ],
+            },
+          },
+        }),
+        this.prisma.requerimiento.count({
+          where: { solicitanteId: userId, estado: EstadoRequerimiento.RECHAZADO },
+        }),
+        this.prisma.requerimiento.count({
+          where: { solicitanteId: userId, estado: EstadoRequerimiento.EN_REVISION },
+        }),
       ]);
 
     return { total, borrador, pendiente, aprobado, rechazado, enRevision };
@@ -262,10 +484,25 @@ export class RequerimientosService {
     const [total, pendientes, aprobados, rechazados, enRevision] =
       await Promise.all([
         this.prisma.requerimiento.count(),
-        this.prisma.requerimiento.count({ where: { estado: EstadoRequerimiento.PENDIENTE } }),
-        this.prisma.requerimiento.count({ where: { estado: EstadoRequerimiento.APROBADO } }),
-        this.prisma.requerimiento.count({ where: { estado: EstadoRequerimiento.RECHAZADO } }),
-        this.prisma.requerimiento.count({ where: { estado: EstadoRequerimiento.EN_REVISION } }),
+        this.prisma.requerimiento.count({
+          where: { estado: EstadoRequerimiento.PENDIENTE },
+        }),
+        this.prisma.requerimiento.count({
+          where: {
+            estado: {
+              in: [
+                EstadoRequerimiento.APROBADO,
+                EstadoRequerimiento.APROBADO_GERENTE,
+              ],
+            },
+          },
+        }),
+        this.prisma.requerimiento.count({
+          where: { estado: EstadoRequerimiento.RECHAZADO },
+        }),
+        this.prisma.requerimiento.count({
+          where: { estado: EstadoRequerimiento.EN_REVISION },
+        }),
       ]);
 
     return { total, pendientes, aprobados, rechazados, enRevision };

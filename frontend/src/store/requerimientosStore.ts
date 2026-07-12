@@ -16,8 +16,9 @@ interface RequerimientosState {
   fetchPendientes: () => Promise<void>;
   fetchById: (id: number) => Promise<void>;
   create: (data: unknown) => Promise<Requerimiento>;
+  update: (id: number, data: unknown) => Promise<Requerimiento>;
   enviarParaAprobacion: (id: number) => Promise<void>;
-  updateEstado: (id: number, data: { estado: string; comentario?: string }) => Promise<void>;
+  updateEstado: (id: number, data: { estado: string; comentario?: string }) => Promise<Requerimiento>;
   fetchEstadisticasTrabajador: () => Promise<void>;
   fetchEstadisticasJefe: () => Promise<void>;
   clearError: () => void;
@@ -83,6 +84,22 @@ export const useRequerimientosStore = create<RequerimientosState>((set, get) => 
     }
   },
 
+  update: async (id: number, formData: unknown) => {
+    set({ isLoading: true, error: null });
+    try {
+      const { data } = await api.patch(`/requerimientos/${id}`, formData);
+      set({ currentRequerimiento: data });
+      await get().fetchAll();
+      return data;
+    } catch (e: unknown) {
+      const msg = getMsg(e);
+      set({ error: msg });
+      throw new Error(msg);
+    } finally {
+      set({ isLoading: false });
+    }
+  },
+
   enviarParaAprobacion: async (id: number) => {
     set({ isLoading: true, error: null });
     try {
@@ -100,8 +117,10 @@ export const useRequerimientosStore = create<RequerimientosState>((set, get) => 
   updateEstado: async (id: number, formData: { estado: string; comentario?: string }) => {
     set({ isLoading: true, error: null });
     try {
-      await api.patch(`/requerimientos/${id}/estado`, formData);
+      const { data } = await api.patch(`/requerimientos/${id}/estado`, formData);
+      set({ currentRequerimiento: data });
       await get().fetchAll();
+      return data;
     } catch (e: unknown) {
       const msg = getMsg(e);
       set({ error: msg });

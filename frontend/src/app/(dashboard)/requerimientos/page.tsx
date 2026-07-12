@@ -5,11 +5,18 @@ import { useAuthStore } from '@/store/authStore';
 import { useRequerimientosStore } from '@/store/requerimientosStore';
 import { EstadoBadge, PrioridadBadge } from '@/components/ui/Badge';
 import { EstadoRequerimiento, Prioridad, Requerimiento } from '@/types';
-import { formatDateShort } from '@/lib/utils';
+import { formatDateOnly } from '@/lib/utils';
 import Link from 'next/link';
 import { Plus, Search, Filter, ClipboardList, ChevronRight } from 'lucide-react';
 
-const ESTADOS: EstadoRequerimiento[] = ['BORRADOR', 'PENDIENTE', 'APROBADO', 'RECHAZADO', 'EN_REVISION'];
+const ESTADOS: EstadoRequerimiento[] = [
+  'BORRADOR',
+  'PENDIENTE',
+  'APROBADO',
+  'APROBADO_GERENTE',
+  'RECHAZADO',
+  'EN_REVISION',
+];
 const PRIORIDADES: Prioridad[] = ['BAJA', 'MEDIA', 'ALTA', 'URGENTE'];
 
 export default function RequerimientosPage() {
@@ -22,7 +29,7 @@ export default function RequerimientosPage() {
 
   const isJefe = ['JEFE_AREA', 'ADMIN', 'GERENTE', 'ANALISTA_COMPRAS'].includes(user?.rol || '');
   const isTrabajador = user?.rol === 'TRABAJADOR';
-  const canCreateRequerimiento = ['TRABAJADOR', 'ADMIN', 'ANALISTA_COMPRAS'].includes(user?.rol || '');
+  const canCreateRequerimiento = ['TRABAJADOR', 'ADMIN'].includes(user?.rol || '');
 
   useEffect(() => {
     fetchAll();
@@ -157,7 +164,7 @@ export default function RequerimientosPage() {
                       <PrioridadBadge prioridad={req.prioridad} size="sm" />
                     </td>
                     <td className="px-4 py-4 text-sm text-gray-500">
-                      {formatDateShort(req.fechaRequerida)}
+                      {formatDateOnly(req.fechaRequerida)}
                     </td>
                     <td className="px-4 py-4 text-sm text-gray-500 max-w-[200px] truncate">
                       {req.descripcion || <span className="italic text-gray-300">Sin descripcion</span>}

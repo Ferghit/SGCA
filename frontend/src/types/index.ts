@@ -12,6 +12,7 @@ export type EstadoRequerimiento =
   | 'BORRADOR'
   | 'PENDIENTE'
   | 'APROBADO'
+  | 'APROBADO_GERENTE'
   | 'RECHAZADO'
   | 'EN_REVISION';
 
@@ -26,6 +27,8 @@ export interface Usuario {
   activo: boolean;
   createdAt?: string;
 }
+
+export type User = Usuario;
 
 export interface Producto {
   id: number;
@@ -61,11 +64,13 @@ export interface HistorialRequerimiento {
 export interface Requerimiento {
   id: number;
   codigo: string;
+  solicitanteId: number;
+  aprobadorId?: number | null;
   estado: EstadoRequerimiento;
   prioridad: Prioridad;
   fechaRequerida: string;
-  descripcion?: string;
-  comentarioJefe?: string;
+  descripcion?: string | null;
+  comentarioJefe?: string | null;
   createdAt: string;
   updatedAt: string;
   solicitante: Usuario;
