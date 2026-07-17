@@ -4,12 +4,19 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useAlmacenStore } from '@/store/almacenStore';
 import { Card } from '@/components/ui/Card';
-import { Package } from 'lucide-react';
+import { ChevronRight, Eye, Package } from 'lucide-react';
 
 type Tab = 'pendientes' | 'registradas';
 
 export default function RecepcionesPage() {
-  const { ordenesPendientes, recepciones, fetchOrdenesPendientes, fetchRecepciones, isLoading } = useAlmacenStore();
+  const {
+    ordenesPendientes,
+    recepciones,
+    fetchOrdenesPendientes,
+    fetchRecepciones,
+    isLoading,
+    isLoadingRecepciones,
+  } = useAlmacenStore();
   const [activeTab, setActiveTab] = useState<Tab>('pendientes');
 
   useEffect(() => {
@@ -78,16 +85,35 @@ export default function RecepcionesPage() {
 
       {activeTab === 'registradas' && (
         <Card title="Recepciones registradas">
-          {recepciones.length === 0 && <p className="text-sm text-gray-400">Aún no hay recepciones.</p>}
+          {isLoadingRecepciones && <p className="text-sm text-gray-400">Cargando recepciones...</p>}
+          {!isLoadingRecepciones && recepciones.length === 0 && <p className="text-sm text-gray-400">Aún no hay recepciones.</p>}
           <div className="space-y-2">
             {recepciones.map((r) => (
-              <div key={r.id} className="flex items-center justify-between p-3 border border-gray-100 rounded-lg">
-                <div>
-                  <p className="font-medium text-sm">OC {r.ordenCompra?.numero}</p>
-                  <p className="text-xs text-gray-500">{new Date(r.fechaRecepcion).toLocaleDateString('es-PE')}</p>
+              <Link
+                key={r.id}
+                href={`/recepciones/registradas/${r.id}`}
+                className="group flex items-center justify-between gap-4 rounded-lg border border-gray-100 p-3 transition-colors hover:border-teal-200 hover:bg-teal-50/40"
+              >
+                <div className="flex min-w-0 items-center gap-3">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-teal-50 text-teal-700">
+                    <Package className="h-4 w-4" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium">Recepción #{r.id} · OC {r.ordenCompra?.numero}</p>
+                    <p className="text-xs text-gray-500">
+                      {new Date(r.fechaRecepcion).toLocaleDateString('es-PE')} · {r.ordenCompra?.proveedor?.razonSocial}
+                    </p>
+                  </div>
                 </div>
-                <span className="text-xs text-gray-400">{r.detalles.length} ítems</span>
-              </div>
+                <div className="flex shrink-0 items-center gap-3">
+                  <span className="hidden text-xs text-gray-400 sm:inline">{r.detalles.length} ítems</span>
+                  <span className="flex items-center gap-1 text-xs font-medium text-teal-700">
+                    <Eye className="h-4 w-4" />
+                    <span className="hidden sm:inline">Ver detalle</span>
+                  </span>
+                  <ChevronRight className="h-4 w-4 text-gray-300 transition-transform group-hover:translate-x-0.5 group-hover:text-teal-600" />
+                </div>
+              </Link>
             ))}
           </div>
         </Card>

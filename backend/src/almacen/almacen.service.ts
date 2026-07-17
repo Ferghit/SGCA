@@ -106,8 +106,16 @@ export class AlmacenService {
         guias: true 
       }, 
     }); 
-    if (!rec) throw new NotFoundException('Recepción no encontrada'); 
-    return rec; 
+    if (!rec) throw new NotFoundException('Recepción no encontrada');
+
+    const responsable = rec.responsableId
+      ? await this.prisma.usuario.findUnique({
+          where: { id: rec.responsableId },
+          select: { id: true, nombre: true, apellido: true, email: true },
+        })
+      : null;
+
+    return { ...rec, responsable };
   } 
  
   async generarGuia(recepcionId: number, emisor: string, receptor: string) { 

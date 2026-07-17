@@ -229,7 +229,10 @@ export interface RecepcionDetalle {
 
 export interface Recepcion {
   id: number; ordenCompraId: number; fechaRecepcion: string; observaciones?: string;
-  ordenCompra: OrdenCompra; detalles: RecepcionDetalle[]; guias?: { id: number; numero: string }[];
+  responsableId?: number; estado?: string; createdAt?: string;
+  responsable?: Pick<Usuario, 'id' | 'nombre' | 'apellido' | 'email'> | null;
+  ordenCompra: OrdenCompra; detalles: RecepcionDetalle[];
+  guias?: { id: number; numero: string; emisor?: string; receptor?: string; fechaEmision?: string }[];
 }
 
 export interface InventarioItem {
