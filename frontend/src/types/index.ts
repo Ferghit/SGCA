@@ -191,6 +191,8 @@ export interface Proveedor { id: number; ruc: string; razonSocial: string; email
 export interface OrdenCompraDetalle {
   id: number; productoId?: number; descripcion: string;
   cantidad: number; precioUnitario: number; subtotal: number;
+  cantidadRecibidaAcumulada?: number;
+  cantidadPendiente?: number;
 }
 
 export interface HistorialOrdenCompra {
