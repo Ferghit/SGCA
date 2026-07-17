@@ -4,12 +4,15 @@ import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import {
+  AlertTriangle,
   ArrowLeft,
   CalendarDays,
   CheckCircle2,
   ClipboardCheck,
   FileText,
+  Mail,
   Package,
+  RotateCcw,
   Truck,
   UserRound,
 } from 'lucide-react';
@@ -88,8 +91,9 @@ export default function RecepcionRegistradaDetallePage() {
           <h1 className="page-title">Recepción #{recepcion.id}</h1>
           <p className="text-sm text-gray-500">Detalle registrado para la orden {orden.numero}</p>
         </div>
-        <span className="rounded-full bg-emerald-100 px-3 py-1.5 text-xs font-semibold text-emerald-700">
-          {recepcion.estado || 'REGISTRADA'}
+        <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold ${resumen.observados === 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+          {resumen.observados === 0 ? <CheckCircle2 className="h-3.5 w-3.5" /> : <AlertTriangle className="h-3.5 w-3.5" />}
+          {resumen.observados === 0 ? 'Recepción conforme' : 'Con observaciones'}
         </span>
       </div>
 
@@ -99,6 +103,16 @@ export default function RecepcionRegistradaDetallePage() {
         <Summary icon={<Package className="h-5 w-5" />} label="Unidades recibidas" value={`${resumen.recibidos} de ${resumen.esperados}`} />
         <Summary icon={<ClipboardCheck className="h-5 w-5" />} label="Resultado" value={resumen.observados === 0 ? 'Todo conforme' : `${resumen.observados} ítem(s) observado(s)`} />
       </div>
+
+      {resumen.observados > 0 && (
+        <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4">
+          <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
+          <div>
+            <p className="text-sm font-semibold text-amber-800">La recepción contiene diferencias</p>
+            <p className="mt-0.5 text-sm text-amber-700">Revise los productos observados y sus comentarios en el detalle inferior.</p>
+          </div>
+        </div>
+      )}
 
       <section className="rounded-xl border border-gray-100 bg-white p-6 shadow-card">
         <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
@@ -111,11 +125,18 @@ export default function RecepcionRegistradaDetallePage() {
             Ver orden {orden.numero}
           </Link>
         </div>
-        <div className="grid grid-cols-1 gap-5 text-sm md:grid-cols-3">
+        <div className="grid grid-cols-1 gap-5 text-sm sm:grid-cols-2 lg:grid-cols-4">
           <Info label="Orden de compra" value={orden.numero} />
+          <Info label="Estado de la orden" value={orden.estado.replaceAll('_', ' ')} />
           <Info label="Responsable" value={recepcion.responsable ? `${recepcion.responsable.nombre} ${recepcion.responsable.apellido}` : 'No registrado'} icon={<UserRound className="h-4 w-4" />} />
           <Info label="RUC del proveedor" value={orden.proveedor?.ruc || 'No registrado'} />
         </div>
+        {recepcion.responsable?.email && (
+          <div className="mt-4 flex items-center gap-2 border-t border-gray-100 pt-4 text-sm text-gray-600">
+            <Mail className="h-4 w-4 text-gray-400" />
+            <span>{recepcion.responsable.email}</span>
+          </div>
+        )}
         {recepcion.observaciones && (
           <div className="mt-5 rounded-lg border border-blue-100 bg-blue-50 p-4">
             <p className="text-xs font-semibold uppercase tracking-wide text-blue-600">Observaciones generales</p>
@@ -170,6 +191,29 @@ export default function RecepcionRegistradaDetallePage() {
         </div>
       </section>
 
+      {recepcion.devoluciones && recepcion.devoluciones.length > 0 && (
+        <section className="rounded-xl border border-red-100 bg-white p-6 shadow-card">
+          <div className="flex items-center gap-2">
+            <RotateCcw className="h-5 w-5 text-red-600" />
+            <h2 className="text-lg font-semibold text-gray-800">Devoluciones asociadas</h2>
+          </div>
+          <div className="mt-4 divide-y divide-gray-100 rounded-lg border border-gray-100">
+            {recepcion.devoluciones.map((devolucion) => (
+              <div key={devolucion.id} className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-gray-800">{devolucion.producto?.nombre || devolucion.descripcion}</p>
+                  <p className="mt-1 text-sm text-gray-600">{devolucion.motivo}</p>
+                  <p className="mt-1 text-xs text-gray-400">{formatDateTime(devolucion.createdAt)}</p>
+                </div>
+                <div className="shrink-0 sm:text-right">
+                  <p className="font-semibold text-red-700">{devolucion.cantidad} unidad(es)</p>
+                  <p className="mt-1 text-xs text-gray-400">Devolución #{devolucion.id}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
       <section className="rounded-xl border border-gray-100 bg-white p-6 shadow-card">
         <h2 className="text-lg font-semibold text-gray-800">Guías de remisión</h2>
         {recepcion.guias && recepcion.guias.length > 0 ? (
@@ -182,6 +226,7 @@ export default function RecepcionRegistradaDetallePage() {
                   <p className="text-xs text-gray-500">
                     {guia.emisor || 'Emisor no registrado'} → {guia.receptor || 'Receptor no registrado'}
                   </p>
+                  {guia.fechaEmision && <p className="mt-1 text-xs text-gray-400">Emitida: {formatDateTime(guia.fechaEmision)}</p>}
                 </div>
               </div>
             ))}

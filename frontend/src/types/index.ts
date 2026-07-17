@@ -233,6 +233,10 @@ export interface Recepcion {
   responsable?: Pick<Usuario, 'id' | 'nombre' | 'apellido' | 'email'> | null;
   ordenCompra: OrdenCompra; detalles: RecepcionDetalle[];
   guias?: { id: number; numero: string; emisor?: string; receptor?: string; fechaEmision?: string }[];
+  devoluciones?: {
+    id: number; productoId?: number; descripcion: string; cantidad: number;
+    motivo: string; notificada: boolean; createdAt: string; producto?: Producto;
+  }[];
 }
 
 export interface InventarioItem {
@@ -241,7 +245,17 @@ export interface InventarioItem {
 }
 
 export interface MovimientoInventario {
-  tipo: 'ENTRADA' | 'SALIDA'; producto: string; cantidad: number; fecha: string; referencia: string;
+  id: number;
+  productoId?: number | null;
+  tipo: 'ENTRADA' | 'SALIDA';
+  origen: 'RECEPCION' | 'DEVOLUCION';
+  origenId: number;
+  producto: string;
+  cantidad: number;
+  fecha: string;
+  referencia: string;
+  detalle?: string | null;
+  enlace?: string;
 }
 
 export interface Devolucion {

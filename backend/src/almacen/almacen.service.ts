@@ -53,7 +53,7 @@ export class AlmacenService {
                 estado: item.estado as EstadoItemRecepcion, 
                 observacion: item.observacion, 
               }; 
-            }), 
+            }),
           }, 
         }, 
         include: { detalles: true }, 
@@ -103,7 +103,8 @@ export class AlmacenService {
       include: { 
         ordenCompra: { include: { proveedor: true } }, 
         detalles: { include: { producto: true } }, 
-        guias: true 
+        guias: true,
+        devoluciones: { include: { producto: true }, orderBy: { createdAt: 'desc' } },
       }, 
     }); 
     if (!rec) throw new NotFoundException('Recepción no encontrada');
@@ -137,17 +138,45 @@ export class AlmacenService {
         where: { estado: { not: 'DANADO' }, ...(productoId ? { productoId } : {}) }, 
         include: { recepcion: true }, 
         orderBy: { id: 'desc' }, 
-        take: 50, 
-      }), 
-      this.prisma.devolucion.findMany({ where: productoId ? { productoId } : {}, orderBy: { createdAt: 'desc' }, take: 50 }), 
+        take: productoId ? undefined : 50,
+      }),
+      this.prisma.devolucion.findMany({
+        where: productoId ? { productoId } : {},
+        orderBy: { createdAt: 'desc' },
+        take: productoId ? undefined : 50,
+      }),
     ]); 
     const ids = [...new Set([...entradas.map((e) => e.productoId), ...salidas.map((s) => s.productoId)].filter((x): x is number => !!x))]; 
     const productos = await this.prisma.producto.findMany({ where: { id: { in: ids } } }); 
     const nombre = (id?: number | null) => productos.find((p) => p.id === id)?.nombre; 
  
     return [ 
-      ...entradas.map((e) => ({ tipo: 'ENTRADA', producto: nombre(e.productoId) ?? e.descripcion, cantidad: e.cantidadRecibida, fecha: e.recepcion.fechaRecepcion, referencia: `Recepción #${e.recepcionId}` })), 
-      ...salidas.map((s) => ({ tipo: 'SALIDA', producto: nombre(s.productoId) ?? s.descripcion, cantidad: s.cantidad, fecha: s.createdAt, referencia: `Devolución #${s.id}` })), 
+      ...entradas.map((e) => ({
+        id: e.id,
+        productoId: e.productoId,
+        tipo: 'ENTRADA' as const,
+        origen: 'RECEPCION' as const,
+        origenId: e.recepcionId,
+        producto: nombre(e.productoId) ?? e.descripcion,
+        cantidad: e.cantidadRecibida,
+        fecha: e.recepcion.fechaRecepcion,
+        referencia: `Recepción #${e.recepcionId}`,
+        detalle: e.observacion,
+        enlace: `/recepciones/registradas/${e.recepcionId}`,
+      })),
+      ...salidas.map((s) => ({
+        id: s.id,
+        productoId: s.productoId,
+        tipo: 'SALIDA' as const,
+        origen: 'DEVOLUCION' as const,
+        origenId: s.id,
+        producto: nombre(s.productoId) ?? s.descripcion,
+        cantidad: s.cantidad,
+        fecha: s.createdAt,
+        referencia: `Devolución #${s.id}`,
+        detalle: s.motivo,
+        enlace: '/devoluciones',
+      })),
     ].sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime()); 
   } 
  

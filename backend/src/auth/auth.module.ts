@@ -23,7 +23,11 @@ import { GoogleStrategy } from './strategies/google.strategy';
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtStrategy, GoogleStrategy],
+  providers: [
+    AuthService, 
+    JwtStrategy,
+    ...(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_ID !== 'tu_google_client_id' ? [GoogleStrategy] : [])
+  ],
   exports: [AuthService, JwtModule],
 })
 export class AuthModule {}
