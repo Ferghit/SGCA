@@ -15,6 +15,7 @@ interface CotizacionesState {
   crearSolicitud: (data: any) => Promise<SolicitudCotizacion>;
   cerrarSolicitud: (id: number) => Promise<void>;
   seleccionarGanador: (id: number, data: { ofertaId: number; justificacion?: string }) => Promise<void>;
+  crearNuevaRonda: (id: number, data: { fechaLimite: string; motivo?: string }) => Promise<SolicitudCotizacion>;
   enviarOferta: (data: any) => Promise<void>;
   clearError: () => void;
 }
@@ -72,6 +73,25 @@ export const useCotizacionesStore = create<CotizacionesState>((set) => ({
       solicitudes: s.solicitudes.map((sol) => (sol.id === id ? data : sol)),
       solicitudActual: data,
     }));
+  },
+
+  crearNuevaRonda: async (id, payload) => {
+    set({ isLoading: true, error: null });
+    try {
+      const { data } = await api.post(`/cotizaciones/solicitudes/${id}/nueva-ronda`, payload);
+      set((s) => ({
+        solicitudes: [data, ...s.solicitudes.map((sol) =>
+          sol.id === id ? { ...sol, estado: 'CANCELADA' as const } : sol,
+        )],
+        solicitudActual: data,
+        isLoading: false,
+      }));
+      return data;
+    } catch (e: any) {
+      const msg = e.response?.data?.message || 'Error al crear la nueva ronda';
+      set({ error: msg, isLoading: false });
+      throw new Error(msg);
+    }
   },
 
   enviarOferta: async (payload) => {

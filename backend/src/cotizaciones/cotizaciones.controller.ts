@@ -13,6 +13,7 @@ import { CotizacionesService } from './cotizaciones.service';
 import { CreateSolicitudCotizacionDto } from './dto/create-solicitud.dto';
 import { CreateOfertaDto } from './dto/create-oferta.dto';
 import { SeleccionarGanadorDto } from './dto/seleccionar-ganador.dto';
+import { NuevaRondaCotizacionDto } from './dto/nueva-ronda.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
@@ -66,6 +67,16 @@ export class CotizacionesController {
     @Body() dto: SeleccionarGanadorDto,
   ) {
     return this.service.seleccionarGanador(id, dto);
+  }
+
+  @Roles(Rol.ANALISTA_COMPRAS, Rol.ADMIN)
+  @Post('solicitudes/:id/nueva-ronda')
+  crearNuevaRonda(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: NuevaRondaCotizacionDto,
+    @Request() req: any,
+  ) {
+    return this.service.crearNuevaRonda(id, dto, req.user.id, req.user.rol);
   }
 
   // ── Proveedor: enviar oferta ─────────────────────────────────────────────────

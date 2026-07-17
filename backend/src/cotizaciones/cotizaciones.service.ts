@@ -8,11 +8,49 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CreateSolicitudCotizacionDto } from './dto/create-solicitud.dto';
 import { CreateOfertaDto } from './dto/create-oferta.dto';
 import { SeleccionarGanadorDto } from './dto/seleccionar-ganador.dto';
+import { NuevaRondaCotizacionDto } from './dto/nueva-ronda.dto';
 import { EstadoSolicitudCotizacion, EstadoRequerimiento, EstadoOferta } from '@prisma/client';
 
 @Injectable()
 export class CotizacionesService {
   constructor(private prisma: PrismaService) {}
+
+  private calcularPlazoMaximoDias(fechaRequerida: Date): number {
+    const milisegundosPorDia = 24 * 60 * 60 * 1000;
+    return Math.max(1, Math.ceil((fechaRequerida.getTime() - Date.now()) / milisegundosPorDia));
+  }
+
+  private async obtenerItemsFaltantes(requerimientoId: number, db: any = this.prisma) {
+    const requerimiento = await db.requerimiento.findUnique({
+      where: { id: requerimientoId },
+      include: {
+        detalles: {
+          include: {
+            producto: { include: { inventario: true } },
+          },
+        },
+      },
+    });
+
+    if (!requerimiento) throw new NotFoundException('Requerimiento no encontrado');
+
+    const items = requerimiento.detalles
+      .map((detalle: any) => {
+        const cantidadSolicitada = Number(detalle.cantidad);
+        const stockDisponible = Number(detalle.producto.inventario[0]?.cantidad ?? 0);
+        return {
+          descripcion: detalle.producto.nombre,
+          cantidad: Math.max(0, cantidadSolicitada - stockDisponible),
+          unidadMedida: detalle.unidadMedida,
+          cantidadSolicitada,
+          stockDisponible,
+          productoId: detalle.productoId,
+        };
+      })
+      .filter((item: any) => item.cantidad > 0);
+
+    return { requerimiento, items };
+  }
 
   // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -29,13 +67,9 @@ export class CotizacionesService {
   // ─── Solicitudes de Cotización ──────────────────────────────────────────────
 
   async crearSolicitud(dto: CreateSolicitudCotizacionDto, analistaId: number) {
-    const requerimiento = await this.prisma.requerimiento.findUnique({
-      where: { id: dto.requerimientoId },
-    });
-
-    if (!requerimiento) {
-      throw new NotFoundException('Requerimiento no encontrado');
-    }
+    const { requerimiento, items: itemsFaltantes } = await this.obtenerItemsFaltantes(
+      dto.requerimientoId,
+    );
 
     if (requerimiento.estado !== EstadoRequerimiento.APROBADO_GERENTE) {
       throw new BadRequestException(
@@ -53,6 +87,12 @@ export class CotizacionesService {
     if (existente) {
       throw new BadRequestException(
         'Ya existe una solicitud de cotización activa para este requerimiento',
+      );
+    }
+
+    if (itemsFaltantes.length === 0) {
+      throw new BadRequestException(
+        'El inventario cubre todas las cantidades del requerimiento; no hay faltantes por cotizar',
       );
     }
 
@@ -76,7 +116,7 @@ export class CotizacionesService {
             descripcion: dto.descripcion,
             fechaLimite: new Date(dto.fechaLimite),
             items: {
-              create: dto.items.map((item) => ({
+              create: itemsFaltantes.map((item: any) => ({
                 descripcion: item.descripcion,
                 cantidad: item.cantidad,
                 unidadMedida: item.unidadMedida,
@@ -123,7 +163,8 @@ export class CotizacionesService {
   async findAllSolicitudes(userRol: string, userId: number) {
     const where: any = {};
 
-    // Proveedor: ve las abiertas + las que tiene oferta
+    // Proveedor: esta vista muestra exclusivamente solicitudes abiertas.
+    // Su historial permanece disponible en /cotizaciones/mis-ofertas.
     if (userRol === 'PROVEEDOR') {
       // Buscar el proveedor asociado al usuario
       const usuario = await this.prisma.usuario.findUnique({ where: { id: userId } });
@@ -136,15 +177,7 @@ export class CotizacionesService {
         where: { email: usuario.email },
       });
       
-      if (proveedor) {
-        where.OR = [
-          { estado: EstadoSolicitudCotizacion.ABIERTA },
-          { ofertas: { some: { proveedorId: proveedor.id } } }
-        ];
-      } else {
-        // Si no hay proveedor, solo ve abiertas
-        where.estado = EstadoSolicitudCotizacion.ABIERTA;
-      }
+      where.estado = EstadoSolicitudCotizacion.ABIERTA;
     }
 
     return this.prisma.solicitudCotizacion.findMany({
@@ -191,8 +224,14 @@ export class CotizacionesService {
     
     // Return with ordenCompra as a single object (take first/only one from array)
     const { ordenesCompra, ...rest } = solicitud;
+    const plazoMaximoDias = this.calcularPlazoMaximoDias(solicitud.requerimiento.fechaRequerida);
     const result = {
       ...rest,
+      plazoMaximoDias,
+      ofertas: rest.ofertas.map((oferta) => ({
+        ...oferta,
+        riesgoPlazo: oferta.plazoEntregaDias > plazoMaximoDias,
+      })),
       ordenCompra: ordenesCompra[0] || null,
     };
 
@@ -337,6 +376,7 @@ export class CotizacionesService {
 
     const solicitud = await this.prisma.solicitudCotizacion.findUnique({
       where: { id: dto.solicitudCotizacionId },
+      include: { requerimiento: { select: { fechaRequerida: true } } },
     });
 
     if (!solicitud) throw new NotFoundException('Solicitud de cotización no encontrada');
@@ -347,6 +387,16 @@ export class CotizacionesService {
 
     if (new Date() > solicitud.fechaLimite) {
       throw new BadRequestException('El plazo para enviar cotizaciones ha vencido');
+    }
+
+
+    const plazoMaximoDias = this.calcularPlazoMaximoDias(
+      solicitud.requerimiento.fechaRequerida,
+    );
+    if (dto.plazoEntregaDias > plazoMaximoDias) {
+      throw new BadRequestException(
+        `El plazo máximo permitido para cumplir la fecha requerida es de ${plazoMaximoDias} día(s)`,
+      );
     }
 
     // Verificar si ya existe una oferta de este proveedor
@@ -373,21 +423,105 @@ export class CotizacionesService {
       });
     }
 
-    return this.prisma.ofertaProveedor.create({
-      data: {
-        solicitudCotizacionId: dto.solicitudCotizacionId,
-        proveedorId: proveedorRegistrado.id,
-        montoTotal: dto.montoTotal,
-        plazoEntregaDias: dto.plazoEntregaDias,
-        condicionesPago: dto.condicionesPago,
-        notasAdicionales: dto.notasAdicionales,
-        archivoAdjuntoUrl: dto.archivoAdjuntoUrl,
-      },
-      include: {
-        proveedor: { select: { id: true, razonSocial: true } },
-        solicitudCotizacion: { select: { id: true, codigo: true, titulo: true } },
-      },
+    return this.prisma.$transaction(async (tx) => {
+      const oferta = await tx.ofertaProveedor.create({
+        data: {
+          solicitudCotizacionId: dto.solicitudCotizacionId,
+          proveedorId: proveedorRegistrado.id,
+          montoTotal: dto.montoTotal,
+          plazoEntregaDias: dto.plazoEntregaDias,
+          condicionesPago: dto.condicionesPago,
+          notasAdicionales: dto.notasAdicionales,
+          archivoAdjuntoUrl: dto.archivoAdjuntoUrl,
+        },
+        include: {
+          proveedor: { select: { id: true, razonSocial: true } },
+          solicitudCotizacion: { select: { id: true, codigo: true, titulo: true } },
+        },
+      });
+
+      await tx.notificacion.create({
+        data: {
+          emisorId: userId,
+          receptorId: solicitud.analistaId,
+          requerimientoId: solicitud.requerimientoId,
+          titulo: `Nueva cotización recibida - ${solicitud.codigo}`,
+          mensaje: `${proveedorRegistrado.razonSocial} envió una oferta para ${solicitud.titulo}.`,
+        },
+      });
+
+      return oferta;
     });
+  }
+
+  async crearNuevaRonda(
+    solicitudId: number,
+    dto: NuevaRondaCotizacionDto,
+    usuarioId: number,
+    usuarioRol: string,
+  ) {
+    const fechaLimite = new Date(dto.fechaLimite);
+    if (fechaLimite <= new Date()) {
+      throw new BadRequestException('La nueva fecha límite debe ser futura');
+    }
+
+    const anterior = await this.prisma.solicitudCotizacion.findUnique({
+      where: { id: solicitudId },
+      include: { requerimiento: true },
+    });
+    if (!anterior) throw new NotFoundException('Solicitud de cotización no encontrada');
+    if (anterior.estado !== EstadoSolicitudCotizacion.CERRADA) {
+      throw new BadRequestException('Solo se puede abrir una nueva ronda desde una solicitud cerrada');
+    }
+    if (usuarioRol !== 'ADMIN' && anterior.analistaId !== usuarioId) {
+      throw new ForbiddenException('Solo el analista responsable puede solicitar una nueva ronda');
+    }
+
+    const { items } = await this.obtenerItemsFaltantes(anterior.requerimientoId);
+    if (items.length === 0) {
+      throw new BadRequestException('El inventario ya cubre el requerimiento; no hay faltantes por cotizar');
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      const year = new Date().getFullYear();
+      const ultimo = await tx.solicitudCotizacion.findFirst({
+        where: { codigo: { startsWith: `COT-${year}-` } },
+        orderBy: { codigo: 'desc' },
+      });
+      const siguiente = ultimo ? parseInt(ultimo.codigo.split('-')[2], 10) + 1 : 1;
+      const codigo = `COT-${year}-${String(siguiente).padStart(3, '0')}`;
+
+      await tx.solicitudCotizacion.update({
+        where: { id: solicitudId },
+        data: { estado: EstadoSolicitudCotizacion.CANCELADA },
+      });
+
+      return tx.solicitudCotizacion.create({
+        data: {
+          codigo,
+          requerimientoId: anterior.requerimientoId,
+          analistaId: anterior.analistaId,
+          titulo: `${anterior.titulo} - Nueva ronda`,
+          descripcion: dto.motivo
+            ? `${anterior.descripcion ?? ''}\nMotivo de nueva ronda: ${dto.motivo}`.trim()
+            : anterior.descripcion,
+          fechaLimite,
+          items: {
+            create: items.map((item: any) => ({
+              descripcion: item.descripcion,
+              cantidad: item.cantidad,
+              unidadMedida: item.unidadMedida,
+            })),
+          },
+        },
+        include: {
+          requerimiento: { select: { id: true, codigo: true, descripcion: true } },
+          analista: { select: { id: true, nombre: true, apellido: true } },
+          items: true,
+          ofertas: true,
+        },
+      });
+    }, { isolationLevel: 'Serializable' });
   }
 
   async getMisOfertas(userId: number) {
@@ -468,17 +602,35 @@ export class CotizacionesService {
   // ─── Requerimientos aprobados disponibles para cotizar ─────────────────────
 
   async getRequerimientosAprobados() {
-    return this.prisma.requerimiento.findMany({
+    const requerimientos = await this.prisma.requerimiento.findMany({
       where: {
         estado: EstadoRequerimiento.APROBADO_GERENTE,
         solicitudesCotizacion: { none: { estado: { in: [EstadoSolicitudCotizacion.ABIERTA, EstadoSolicitudCotizacion.CERRADA, EstadoSolicitudCotizacion.ADJUDICADA] } } },
       },
       include: {
-        detalles: { include: { producto: true } },
+        detalles: { include: { producto: { include: { inventario: true } } } },
         solicitante: { select: { id: true, nombre: true, apellido: true } },
       },
       orderBy: { createdAt: 'desc' },
     });
+
+    return requerimientos
+      .map((requerimiento) => ({
+        ...requerimiento,
+        detalles: requerimiento.detalles.map((detalle) => {
+          const cantidadSolicitada = Number(detalle.cantidad);
+          const stockDisponible = Number(detalle.producto.inventario[0]?.cantidad ?? 0);
+          return {
+            ...detalle,
+            cantidadSolicitada,
+            stockDisponible,
+            cantidadACotizar: Math.max(0, cantidadSolicitada - stockDisponible),
+          };
+        }),
+      }))
+      .filter((requerimiento) =>
+        requerimiento.detalles.some((detalle) => detalle.cantidadACotizar > 0),
+      );
   }
 
   // ─── Reporte comparativo para el Analista ──────────────────────────────────

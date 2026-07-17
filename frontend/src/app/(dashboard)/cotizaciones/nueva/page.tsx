@@ -6,10 +6,16 @@ import { useAuthStore } from '@/store/authStore';
 import { useCotizacionesStore } from '@/store/cotizacionesStore';
 import api from '@/lib/api';
 import { Requerimiento } from '@/types';
-import { Plus, Trash2, ArrowLeft } from 'lucide-react';
+import { ArrowLeft, PackageCheck } from 'lucide-react';
 import Link from 'next/link';
 
-interface ItemForm { descripcion: string; cantidad: number; unidadMedida: string; }
+interface ItemForm {
+  descripcion: string;
+  cantidad: number;
+  unidadMedida: string;
+  cantidadSolicitada?: number;
+  stockDisponible?: number;
+}
 
 export default function NuevaSolicitudPage() {
   const router = useRouter();
@@ -47,18 +53,17 @@ export default function NuevaSolicitudPage() {
     setForm((f) => ({ ...f, requerimientoId: id }));
     const req = requerimientos.find((r) => r.id === Number(id));
     if (req?.detalles?.length) {
-      setItems(req.detalles.map((d) => ({
-        descripcion: d.producto?.nombre || '',
-        cantidad: Number(d.cantidad),
-        unidadMedida: d.unidadMedida,
-      })));
+      setItems(req.detalles
+        .filter((d) => Number(d.cantidadACotizar ?? d.cantidad) > 0)
+        .map((d) => ({
+          descripcion: d.producto?.nombre || '',
+          cantidad: Number(d.cantidadACotizar ?? d.cantidad),
+          unidadMedida: d.unidadMedida,
+          cantidadSolicitada: Number(d.cantidadSolicitada ?? d.cantidad),
+          stockDisponible: Number(d.stockDisponible ?? 0),
+        })));
     }
   };
-
-  const addItem = () => setItems((prev) => [...prev, { descripcion: '', cantidad: 1, unidadMedida: 'unidad' }]);
-  const removeItem = (i: number) => setItems((prev) => prev.filter((_, idx) => idx !== i));
-  const updateItem = (i: number, key: keyof ItemForm, val: string | number) =>
-    setItems((prev) => prev.map((item, idx) => idx === i ? { ...item, [key]: val } : item));
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -158,52 +163,22 @@ export default function NuevaSolicitudPage() {
         {/* Ítems */}
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5 space-y-4">
           <div className="flex items-center justify-between">
-            <h2 className="font-semibold text-gray-800">Ítems Requeridos</h2>
-            <button
-              type="button"
-              onClick={addItem}
-              className="flex items-center gap-1.5 text-sm font-medium px-3 py-1.5 rounded-lg transition-colors"
-              style={{ backgroundColor: '#E8F4F5', color: '#006D77' }}
-            >
-              <Plus className="w-4 h-4" /> Agregar ítem
-            </button>
+            <div>
+              <h2 className="font-semibold text-gray-800">Faltantes por cotizar</h2>
+              <p className="text-xs text-gray-500 mt-0.5">Se descuenta automáticamente el stock disponible.</p>
+            </div>
+            <PackageCheck className="w-5 h-5" style={{ color: '#006D77' }} />
           </div>
 
           {items.map((item, i) => (
-            <div key={i} className="flex gap-2 items-start">
-              <div className="flex-1 grid grid-cols-1 sm:grid-cols-3 gap-2">
-                <input
-                  type="text"
-                  value={item.descripcion}
-                  onChange={(e) => updateItem(i, 'descripcion', e.target.value)}
-                  placeholder="Descripción del ítem"
-                  className="sm:col-span-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2"
-                  style={{ '--tw-ring-color': '#006D77' } as React.CSSProperties}
-                />
-                <input
-                  type="number"
-                  value={item.cantidad}
-                  min={0.01}
-                  step={0.01}
-                  onChange={(e) => updateItem(i, 'cantidad', Number(e.target.value))}
-                  placeholder="Cantidad"
-                  className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2"
-                  style={{ '--tw-ring-color': '#006D77' } as React.CSSProperties}
-                />
-                <input
-                  type="text"
-                  value={item.unidadMedida}
-                  onChange={(e) => updateItem(i, 'unidadMedida', e.target.value)}
-                  placeholder="Unidad (kg, unidad, etc.)"
-                  className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2"
-                  style={{ '--tw-ring-color': '#006D77' } as React.CSSProperties}
-                />
+            <div key={i} className="grid grid-cols-2 sm:grid-cols-5 gap-3 rounded-lg border border-gray-100 p-3 text-sm">
+              <div className="col-span-2">
+                <p className="text-xs text-gray-500">Producto</p>
+                <p className="font-medium text-gray-800">{item.descripcion}</p>
               </div>
-              {items.length > 1 && (
-                <button type="button" onClick={() => removeItem(i)} className="p-2 text-red-400 hover:text-red-600 transition-colors">
-                  <Trash2 className="w-4 h-4" />
-                </button>
-              )}
+              <div><p className="text-xs text-gray-500">Solicitado</p><p>{item.cantidadSolicitada}</p></div>
+              <div><p className="text-xs text-gray-500">En stock</p><p className="text-green-700">{item.stockDisponible}</p></div>
+              <div><p className="text-xs text-gray-500">A cotizar</p><p className="font-bold" style={{ color: '#006D77' }}>{item.cantidad} {item.unidadMedida}</p></div>
             </div>
           ))}
         </div>

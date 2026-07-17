@@ -16,13 +16,26 @@ export class OrdenesCompraService {
   private async generarNumeroOC(tx?: any): Promise<string> {
     const year = new Date().getFullYear();
     const prisma = tx || this.prisma;
-    
-    const ultimo = await prisma.ordenCompra.findFirst({
+
+    const ordenesDelAnio = await prisma.ordenCompra.findMany({
       where: { numero: { startsWith: `OC-${year}-` } },
-      orderBy: { numero: 'desc' },
+      select: { numero: true },
     });
-    
-    const siguiente = ultimo ? parseInt(ultimo.numero.split('-')[2], 10) + 1 : 1;
+
+    // El proyecto contiene correlativos históricos de 3 y 4 dígitos. Ordenar
+    // el campo como texto puede considerar "004" mayor que "0005" y repetir
+    // un número existente. Por eso se compara únicamente el sufijo numérico.
+    const ultimoCorrelativo = ordenesDelAnio.reduce((mayor, orden) => {
+      const coincidencia = orden.numero.match(new RegExp(`^OC-${year}-(\\d+)$`));
+      if (!coincidencia) return mayor;
+
+      const correlativo = Number(coincidencia[1]);
+      return Number.isSafeInteger(correlativo)
+        ? Math.max(mayor, correlativo)
+        : mayor;
+    }, 0);
+
+    const siguiente = ultimoCorrelativo + 1;
     return `OC-${year}-${String(siguiente).padStart(4, '0')}`;
   }
 

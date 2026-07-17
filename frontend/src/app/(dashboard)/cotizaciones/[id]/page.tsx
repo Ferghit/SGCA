@@ -9,6 +9,7 @@ import { formatDateShort } from '@/lib/utils';
 import {
   ArrowLeft, Award, Clock, CheckCircle2, XCircle,
   DollarSign, Truck, Star, Lock, Unlock, FileText,
+  AlertTriangle, RefreshCw,
 } from 'lucide-react';
 import Link from 'next/link';
 import { ordenesCompraApi } from '@/lib/api';
@@ -17,7 +18,7 @@ export default function DetalleSolicitudPage() {
   const params = useParams();
   const router = useRouter();
   const user = useAuthStore((s) => s.user);
-  const { solicitudActual, fetchSolicitud, cerrarSolicitud, seleccionarGanador, isLoading } = useCotizacionesStore();
+  const { solicitudActual, fetchSolicitud, cerrarSolicitud, seleccionarGanador, crearNuevaRonda, isLoading } = useCotizacionesStore();
 
   const [ofertaSeleccionadaId, setOfertaSeleccionadaId] = useState<number | null>(null);
   const [justificacion, setJustificacion] = useState('');
@@ -25,6 +26,9 @@ export default function DetalleSolicitudPage() {
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState('');
   const [generandoOC, setGenerandoOC] = useState(false);
+  const [mostrarNuevaRonda, setMostrarNuevaRonda] = useState(false);
+  const [nuevaFechaLimite, setNuevaFechaLimite] = useState('');
+  const [motivoNuevaRonda, setMotivoNuevaRonda] = useState('');
 
   const id = Number(params.id);
   const isAnalista = user?.rol === 'ANALISTA_COMPRAS' || user?.rol === 'ADMIN';
@@ -90,6 +94,26 @@ export default function DetalleSolicitudPage() {
     } finally {
       setGenerandoOC(false);
       setTimeout(() => setToast(''), 5000);
+    }
+  };
+
+  const handleNuevaRonda = async () => {
+    if (!nuevaFechaLimite) {
+      setToast('Selecciona una nueva fecha límite.');
+      return;
+    }
+    setSaving(true);
+    try {
+      const nueva = await crearNuevaRonda(id, {
+        fechaLimite: nuevaFechaLimite,
+        motivo: motivoNuevaRonda || undefined,
+      });
+      setToast('Nueva ronda publicada correctamente.');
+      router.push(`/cotizaciones/${nueva.id}`);
+    } catch (e: any) {
+      setToast(e.message || 'No se pudo crear la nueva ronda.');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -240,6 +264,11 @@ export default function DetalleSolicitudPage() {
                             Seleccionado
                           </span>
                         )}
+                        {oferta.riesgoPlazo && (
+                          <span className="flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full bg-red-100 text-red-700">
+                            <AlertTriangle className="w-3 h-3" /> Riesgo de entrega
+                          </span>
+                        )}
                       </div>
                       <p className="text-xs text-gray-500 mt-0.5">RUC: {oferta.proveedor.ruc}</p>
                     </div>
@@ -260,6 +289,9 @@ export default function DetalleSolicitudPage() {
                     <div>
                       <p className="text-xs text-gray-500 mb-0.5 flex items-center gap-1"><Truck className="w-3 h-3" /> Plazo</p>
                       <p className="font-semibold text-gray-800">{oferta.plazoEntregaDias} días</p>
+                      {oferta.riesgoPlazo && (
+                        <p className="text-xs text-red-600">Supera el máximo de {sol.plazoMaximoDias} día(s)</p>
+                      )}
                       <p className="text-xs text-gray-400">Ptje: {toNumber(oferta.puntajePlazo)?.toFixed(1) ?? '—'}</p>
                     </div>
                     <div>
@@ -332,6 +364,57 @@ export default function DetalleSolicitudPage() {
             <div className="mt-4 bg-blue-50 border border-blue-200 rounded-lg p-3">
               <p className="text-xs font-medium text-blue-700 mb-1">Justificación registrada:</p>
               <p className="text-sm text-blue-800">{sol.justificacionSeleccion}</p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {isAnalista && sol.estado === 'CERRADA' && (
+        <div className="bg-orange-50 border border-orange-200 rounded-xl p-4 space-y-3">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="font-medium text-orange-800 text-sm">¿Las ofertas recibidas no son favorables?</p>
+              <p className="text-xs text-orange-600 mt-0.5">Cancela esta ronda y publica otra conservando el requerimiento y sus faltantes actuales.</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setMostrarNuevaRonda((value) => !value)}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-orange-600 text-white text-sm font-medium shrink-0"
+            >
+              <RefreshCw className="w-4 h-4" /> Nueva ronda
+            </button>
+          </div>
+          {mostrarNuevaRonda && (
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-3 border-t border-orange-200">
+              <div>
+                <label className="block text-xs font-medium text-orange-800 mb-1">Nueva fecha límite</label>
+                <input
+                  type="datetime-local"
+                  value={nuevaFechaLimite}
+                  onChange={(e) => setNuevaFechaLimite(e.target.value)}
+                  min={new Date().toISOString().slice(0, 16)}
+                  className="w-full border border-orange-200 rounded-lg px-3 py-2 text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-orange-800 mb-1">Motivo</label>
+                <input
+                  value={motivoNuevaRonda}
+                  onChange={(e) => setMotivoNuevaRonda(e.target.value)}
+                  placeholder="Precios altos, plazos riesgosos..."
+                  className="w-full border border-orange-200 rounded-lg px-3 py-2 text-sm"
+                />
+              </div>
+              <div className="flex items-end">
+                <button
+                  type="button"
+                  onClick={handleNuevaRonda}
+                  disabled={saving || !nuevaFechaLimite}
+                  className="w-full px-4 py-2 rounded-lg bg-orange-700 text-white text-sm font-medium disabled:opacity-50"
+                >
+                  {saving ? 'Publicando...' : 'Publicar nueva ronda'}
+                </button>
+              </div>
             </div>
           )}
         </div>

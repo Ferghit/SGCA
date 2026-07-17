@@ -50,6 +50,9 @@ export interface RequerimientoDetalle {
   unidadMedida: string;
   observacion?: string;
   producto: Producto;
+  cantidadSolicitada?: number;
+  stockDisponible?: number;
+  cantidadACotizar?: number;
 }
 
 export interface HistorialRequerimiento {
@@ -152,6 +155,7 @@ export interface OfertaProveedor {
   puntajeHistorial?: number;
   puntajeTotal?: number;
   posicionRanking?: number;
+  riesgoPlazo?: boolean;
   createdAt: string;
   proveedor: { id: number; razonSocial: string; ruc: string; email?: string };
   solicitudCotizacion?: SolicitudCotizacion;
@@ -170,7 +174,8 @@ export interface SolicitudCotizacion {
   justificacionSeleccion?: string;
   createdAt: string;
   updatedAt: string;
-  requerimiento?: { id: number; codigo: string; descripcion?: string };
+  plazoMaximoDias?: number;
+  requerimiento?: { id: number; codigo: string; descripcion?: string; fechaRequerida?: string };
   analista?: { id: number; nombre: string; apellido: string };
   items: ItemSolicitudCotizacion[];
   ofertas: OfertaProveedor[];

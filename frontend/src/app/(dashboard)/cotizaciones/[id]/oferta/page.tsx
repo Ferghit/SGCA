@@ -87,6 +87,10 @@ export default function EnviarOfertaPage() {
       return setSubmitError('Ingresa un monto válido');
     if (!form.plazoEntregaDias || Number(form.plazoEntregaDias) < 1)
       return setSubmitError('Ingresa el plazo en días');
+    if (solicitudActual?.plazoMaximoDias && Number(form.plazoEntregaDias) > solicitudActual.plazoMaximoDias)
+      return setSubmitError(
+        `El plazo máximo permitido para cumplir la fecha requerida es de ${solicitudActual.plazoMaximoDias} día(s)`,
+      );
 
     try {
       await enviarOferta({
@@ -281,11 +285,17 @@ export default function EnviarOfertaPage() {
                 value={form.plazoEntregaDias}
                 onChange={(e) => setForm((f) => ({ ...f, plazoEntregaDias: e.target.value }))}
                 min={1}
+                max={sol.plazoMaximoDias}
                 placeholder="7"
                 className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2"
                 style={{ '--tw-ring-color': '#006D77' } as React.CSSProperties}
                 required
               />
+              {sol.plazoMaximoDias && (
+                <p className="text-xs text-amber-600 mt-1">
+                  Plazo máximo permitido: {sol.plazoMaximoDias} día(s), para cumplir la fecha solicitada.
+                </p>
+              )}
             </div>
           </div>
 
@@ -334,6 +344,14 @@ export default function EnviarOfertaPage() {
             </div>
           )}
 
+          {(vencida || sol.estado !== 'ABIERTA') && (
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm text-amber-800">
+              {vencida
+                ? 'No se puede enviar la cotización porque la fecha límite ya venció.'
+                : `No se puede enviar la cotización porque la solicitud está ${sol.estado.toLowerCase()}.`}
+            </div>
+          )}
+
           <div className="flex gap-3 justify-end pt-1">
             {modoEdicion && (
               <button
@@ -361,17 +379,16 @@ export default function EnviarOfertaPage() {
                 Cancelar
               </Link>
             )}
-            {!vencida && sol.estado === 'ABIERTA' && (
-              <button
-                type="submit"
-                disabled={isLoading}
-                className="flex items-center gap-2 px-5 py-2.5 rounded-lg text-white text-sm font-medium transition-colors disabled:opacity-60"
-                style={{ backgroundColor: '#006D77' }}
-              >
-                <Send className="w-4 h-4" />
-                {isLoading ? 'Guardando...' : modoEdicion ? 'Actualizar Cotización' : 'Enviar Cotización'}
-              </button>
-            )}
+            <button
+              type="submit"
+              disabled={isLoading || vencida || sol.estado !== 'ABIERTA'}
+              title={vencida ? 'La fecha límite de esta solicitud ya venció' : undefined}
+              className="flex items-center gap-2 px-5 py-2.5 rounded-lg text-white text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+              style={{ backgroundColor: '#006D77' }}
+            >
+              <Send className="w-4 h-4" />
+              {isLoading ? 'Guardando...' : modoEdicion ? 'Actualizar Cotización' : 'Enviar Cotización'}
+            </button>
           </div>
         </form>
       )}
