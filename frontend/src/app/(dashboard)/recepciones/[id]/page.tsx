@@ -17,6 +17,7 @@ interface ItemForm {
   cantidadRecibida: number;
   estado: EstadoItemRecepcion;
   observacion: string;
+  motivoDevolucion: string;
 }
 
 const formatoCantidad = new Intl.NumberFormat('es-PE', { maximumFractionDigits: 2 });
@@ -58,6 +59,7 @@ export default function RecepcionFormPage() {
                 cantidadRecibida: cantidadPendiente,
                 estado: 'CONFORME' as EstadoItemRecepcion,
                 observacion: '',
+                motivoDevolucion: '',
               };
             })
             .filter((detalle) => detalle.cantidadPendiente > 0),
@@ -105,6 +107,9 @@ export default function RecepcionFormPage() {
       } else if (item.estado === 'DANADO' && item.cantidadRecibida <= 0) {
         errores.push(`${item.descripcion}: indique la cantidad dañada.`);
       }
+      if (item.estado === 'DANADO' && !item.motivoDevolucion.trim()) {
+        errores.push('Indique el motivo de devolución para el producto dañado.');
+      }
     }
     if (items.length > 0 && !items.some((item) => item.cantidadRecibida > 0)) {
       errores.push('Registre al menos una unidad recibida o dañada.');
@@ -124,11 +129,12 @@ export default function RecepcionFormPage() {
       const resultado = await registrarRecepcion({
         ordenCompraId: Number(id),
         observaciones,
-        items: items.map(({ ordenCompraDetalleId, cantidadRecibida, estado, observacion }) => ({
+        items: items.map(({ ordenCompraDetalleId, cantidadRecibida, estado, observacion, motivoDevolucion }) => ({
           ordenCompraDetalleId,
           cantidadRecibida,
           estado,
           observacion: observacion.trim() || undefined,
+          motivoDevolucion: motivoDevolucion.trim() || undefined,
         })),
       });
       router.replace(`/recepciones/registradas/${resultado.recepcion.id}`);
@@ -189,9 +195,9 @@ export default function RecepcionFormPage() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
                   <label className="block">
-                    <span className="mb-1 block text-xs font-medium text-gray-600">Cantidad recibida</span>
+                    <span className="mb-1 block text-xs font-medium text-gray-600">{item.estado === "DANADO" ? "Cantidad dañada / devolver" : "Cantidad recibida"}</span>
                     <input
                       type="number"
                       min="0"
@@ -227,6 +233,18 @@ export default function RecepcionFormPage() {
                       onChange={(event) => actualizarItem(indice, 'observacion', event.target.value)}
                     />
                   </label>
+                  {item.estado === "DANADO" && (
+                    <label className="block">
+                      <span className="mb-1 block text-xs font-medium text-gray-600">Motivo de devolución</span>
+                      <input
+                        type="text"
+                        placeholder="Obligatorio para devolver"
+                        className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+                        value={item.motivoDevolucion}
+                        onChange={(event) => actualizarItem(indice, "motivoDevolucion", event.target.value)}
+                      />
+                    </label>
+                  )}
                 </div>
 
                 {item.estado === 'DANADO' && (

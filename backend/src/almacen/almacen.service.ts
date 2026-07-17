@@ -135,6 +135,9 @@ export class AlmacenService {
           if (!item.observacion?.trim()) {
             throw new BadRequestException(`Indique la observación del producto dañado "${detalleOrden.descripcion}"`);
           }
+          if (!item.motivoDevolucion?.trim()) {
+            throw new BadRequestException(`Indique el motivo de devolución de "${detalleOrden.descripcion}"`);
+          }
         }
 
         return {
@@ -145,6 +148,7 @@ export class AlmacenService {
           cantidadRecibida,
           estado: item.estado,
           observacion: item.observacion?.trim() || null,
+          motivoDevolucion: item.motivoDevolucion?.trim() || null,
         };
       });
 
@@ -157,10 +161,27 @@ export class AlmacenService {
           ordenCompraId: dto.ordenCompraId,
           responsableId,
           observaciones: dto.observaciones?.trim() || null,
-          detalles: { create: detallesParaCrear },
+          detalles: {
+            create: detallesParaCrear.map(({ motivoDevolucion, ...detalle }) => detalle),
+          },
         },
         include: { detalles: true },
       });
+
+      const detallesDañados = detallesParaCrear.filter(
+        (detalle) => detalle.estado === EstadoItemRecepcion.DANADO,
+      );
+      await Promise.all(
+        detallesDañados.map((detalle) => tx.devolucion.create({
+          data: {
+            recepcionId: recepcion.id,
+            productoId: detalle.productoId,
+            descripcion: detalle.descripcion,
+            cantidad: detalle.cantidadRecibida,
+            motivo: detalle.motivoDevolucion!,
+          },
+        })),
+      );
 
       const alertas: string[] = [];
       for (const detalle of recepcion.detalles) {

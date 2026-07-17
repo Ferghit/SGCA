@@ -17,6 +17,10 @@ class RecepcionItemDto {
   @ValidateIf((item: RecepcionItemDto) => item.estado === EstadoItemRecepcion.DANADO)
   @IsString()
   observacion?: string;
+
+  @ValidateIf((item: RecepcionItemDto) => item.estado === EstadoItemRecepcion.DANADO)
+  @IsString()
+  motivoDevolucion?: string;
 }
 
 export class RegistrarRecepcionDto {
