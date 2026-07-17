@@ -3,6 +3,9 @@
 import { useEffect, useState } from 'react';
 import { useAlmacenStore } from '@/store/almacenStore';
 import { Card, StatCard } from '@/components/ui/Card';
+import { Modal } from '@/components/ui/Modal';
+import api from '@/lib/api';
+import type { InventarioItem, MovimientoInventario } from '@/types';
 import { 
   Package, 
   AlertTriangle, 
@@ -19,6 +22,11 @@ export default function InventarioPage() {
   const { inventario, movimientos, fetchInventario, fetchMovimientos } = useAlmacenStore();
   const [searchTerm, setSearchTerm] = useState('');
   const [filterEstado, setFilterEstado] = useState('');
+  const [productoSeleccionado, setProductoSeleccionado] = useState<InventarioItem | null>(null);
+  const [vistaDetalle, setVistaDetalle] = useState<'movimientos' | 'historial'>('movimientos');
+  const [movimientosProducto, setMovimientosProducto] = useState<MovimientoInventario[]>([]);
+  const [cargandoDetalle, setCargandoDetalle] = useState(false);
+  const [errorDetalle, setErrorDetalle] = useState('');
 
   useEffect(() => {
     fetchInventario();
@@ -50,6 +58,49 @@ export default function InventarioPage() {
     const matchesEstado = filterEstado ? estado === filterEstado : true;
     return matchesSearch && matchesEstado;
   });
+
+  const abrirDetalle = async (item: InventarioItem, vista: 'movimientos' | 'historial') => {
+    setProductoSeleccionado(item);
+    setVistaDetalle(vista);
+    setMovimientosProducto([]);
+    setErrorDetalle('');
+    setCargandoDetalle(true);
+
+    try {
+      const { data } = await api.get<MovimientoInventario[]>('/almacen/inventario/movimientos', {
+        params: { productoId: item.productoId },
+      });
+      setMovimientosProducto(data);
+    } catch (error: any) {
+      setErrorDetalle(error.response?.data?.message || 'No se pudieron cargar los movimientos del producto.');
+    } finally {
+      setCargandoDetalle(false);
+    }
+  };
+
+  const cerrarDetalle = () => {
+    setProductoSeleccionado(null);
+    setMovimientosProducto([]);
+    setErrorDetalle('');
+  };
+
+  const movimientosConSaldo = (() => {
+    if (!productoSeleccionado) return [];
+
+    const ordenados = [...movimientosProducto].sort(
+      (a, b) => new Date(a.fecha).getTime() - new Date(b.fecha).getTime(),
+    );
+    const variacionMostrada = ordenados.reduce(
+      (total, movimiento) => total + (movimiento.tipo === 'ENTRADA' ? Number(movimiento.cantidad) : -Number(movimiento.cantidad)),
+      0,
+    );
+    let saldo = Number(productoSeleccionado.cantidad) - variacionMostrada;
+
+    return ordenados.map((movimiento) => {
+      saldo += movimiento.tipo === 'ENTRADA' ? Number(movimiento.cantidad) : -Number(movimiento.cantidad);
+      return { ...movimiento, saldo };
+    });
+  })();
 
   return (
     <div className="space-y-6">
@@ -174,21 +225,23 @@ export default function InventarioPage() {
                     </td>
                     <td className="py-3 px-4 text-right">
                       <div className="flex items-center justify-end gap-2">
-                        <Link 
-                          href="/inventario" 
+                        <button
+                          type="button"
+                          onClick={() => abrirDetalle(item, 'movimientos')}
                           className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-secondary-DEFAULT hover:bg-secondary-50 rounded transition-colors"
                           style={{ color: '#006D77' }}
                         >
                           <Eye className="w-3 h-3" />
                           Ver movimientos
-                        </Link>
-                        <Link 
-                          href="/inventario" 
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => abrirDetalle(item, 'historial')}
                           className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-gray-600 hover:bg-gray-50 rounded transition-colors"
                         >
                           <History className="w-3 h-3" />
                           Historial
-                        </Link>
+                        </button>
                         <Link 
                           href="/recepciones" 
                           className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-gray-600 hover:bg-gray-50 rounded transition-colors"
@@ -205,6 +258,126 @@ export default function InventarioPage() {
           </table>
         </div>
       </Card>
+
+      <Modal
+        isOpen={Boolean(productoSeleccionado)}
+        onClose={cerrarDetalle}
+        title={productoSeleccionado ? `${vistaDetalle === 'movimientos' ? 'Movimientos' : 'Historial'} — ${productoSeleccionado.producto.nombre}` : 'Detalle de inventario'}
+        maxWidthClass="max-w-3xl"
+      >
+        {productoSeleccionado && (
+          <div className="space-y-5">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <div className="rounded-lg bg-gray-50 p-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">Código</p>
+                <p className="mt-1 text-sm font-medium text-gray-700">{productoSeleccionado.producto.codigo}</p>
+              </div>
+              <div className="rounded-lg bg-teal-50 p-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-teal-600">Stock actual</p>
+                <p className="mt-1 text-lg font-bold text-teal-800">{productoSeleccionado.cantidad}</p>
+              </div>
+              <div className="rounded-lg bg-gray-50 p-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">Ubicación</p>
+                <p className="mt-1 text-sm font-medium text-gray-700">{productoSeleccionado.ubicacion || 'Sin ubicación'}</p>
+              </div>
+            </div>
+
+            <div className="flex gap-2 border-b border-gray-200">
+              <button
+                type="button"
+                onClick={() => setVistaDetalle('movimientos')}
+                className={`border-b-2 px-3 py-2 text-sm font-medium ${vistaDetalle === 'movimientos' ? 'border-teal-600 text-teal-700' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+              >
+                Movimientos
+              </button>
+              <button
+                type="button"
+                onClick={() => setVistaDetalle('historial')}
+                className={`border-b-2 px-3 py-2 text-sm font-medium ${vistaDetalle === 'historial' ? 'border-teal-600 text-teal-700' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+              >
+                Historial de saldo
+              </button>
+            </div>
+
+            {cargandoDetalle && (
+              <div className="flex items-center justify-center py-10">
+                <div className="h-8 w-8 animate-spin rounded-full border-4 border-t-transparent" style={{ borderColor: '#006D77', borderTopColor: 'transparent' }} />
+              </div>
+            )}
+
+            {!cargandoDetalle && errorDetalle && (
+              <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">{errorDetalle}</div>
+            )}
+
+            {!cargandoDetalle && !errorDetalle && movimientosProducto.length === 0 && (
+              <div className="py-10 text-center">
+                <ArrowUpDown className="mx-auto mb-2 h-8 w-8 text-gray-300" />
+                <p className="text-sm text-gray-400">Este producto aún no tiene movimientos registrados.</p>
+              </div>
+            )}
+
+            {!cargandoDetalle && !errorDetalle && movimientosProducto.length > 0 && vistaDetalle === 'movimientos' && (
+              <div className="overflow-x-auto rounded-lg border border-gray-100">
+                <table className="w-full min-w-[600px] text-sm">
+                  <thead className="bg-gray-50 text-xs uppercase tracking-wide text-gray-500">
+                    <tr>
+                      <th className="px-4 py-3 text-left font-semibold">Tipo</th>
+                      <th className="px-4 py-3 text-right font-semibold">Cantidad</th>
+                      <th className="px-4 py-3 text-left font-semibold">Fecha</th>
+                      <th className="px-4 py-3 text-left font-semibold">Referencia</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {[...movimientosProducto]
+                      .sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime())
+                      .map((movimiento, index) => (
+                        <tr key={`${movimiento.tipo}-${movimiento.fecha}-${index}`}>
+                          <td className="px-4 py-3">
+                            <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${movimiento.tipo === 'ENTRADA' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
+                              {movimiento.tipo === 'ENTRADA' ? 'Entrada' : 'Salida'}
+                            </span>
+                          </td>
+                          <td className={`px-4 py-3 text-right font-semibold ${movimiento.tipo === 'ENTRADA' ? 'text-emerald-700' : 'text-red-700'}`}>
+                            {movimiento.tipo === 'ENTRADA' ? '+' : '-'}{movimiento.cantidad}
+                          </td>
+                          <td className="px-4 py-3 text-gray-600">{new Date(movimiento.fecha).toLocaleString('es-PE')}</td>
+                          <td className="px-4 py-3 text-gray-600">{movimiento.referencia}</td>
+                        </tr>
+                      ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {!cargandoDetalle && !errorDetalle && movimientosConSaldo.length > 0 && vistaDetalle === 'historial' && (
+              <div className="space-y-0">
+                {movimientosConSaldo.map((movimiento, index) => (
+                  <div key={`${movimiento.tipo}-${movimiento.fecha}-${index}`} className="relative flex gap-4 pb-5 last:pb-0">
+                    <div className="relative flex w-9 shrink-0 justify-center">
+                      <div className={`z-10 flex h-9 w-9 items-center justify-center rounded-full ${movimiento.tipo === 'ENTRADA' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
+                        {movimiento.tipo === 'ENTRADA' ? '+' : '-'}
+                      </div>
+                      {index < movimientosConSaldo.length - 1 && <div className="absolute top-9 h-full w-px bg-gray-200" />}
+                    </div>
+                    <div className="flex min-w-0 flex-1 items-start justify-between gap-4 rounded-lg border border-gray-100 p-3">
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-gray-800">
+                          {movimiento.tipo === 'ENTRADA' ? 'Entrada' : 'Salida'} de {movimiento.cantidad} unidad(es)
+                        </p>
+                        <p className="mt-0.5 text-xs text-gray-500">{movimiento.referencia} · {new Date(movimiento.fecha).toLocaleString('es-PE')}</p>
+                      </div>
+                      <div className="shrink-0 text-right">
+                        <p className="text-xs text-gray-400">Saldo posterior</p>
+                        <p className="font-bold text-gray-800">{movimiento.saldo}</p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </Modal>
     </div>
   );
 }
