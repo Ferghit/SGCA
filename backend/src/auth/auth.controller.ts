@@ -6,6 +6,8 @@ import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { GoogleOAuthGuard } from '../common/guards/google-oauth.guard';
 import { ConfigService } from '@nestjs/config';
 
+const googleEnabled = process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_ID !== 'tu_google_client_id';
+
 @Controller('auth')
 export class AuthController {
   constructor(
@@ -25,11 +27,19 @@ export class AuthController {
 
   @Get('google')
   @UseGuards(GoogleOAuthGuard)
-  async googleAuth(@Request() req: any) {}
+  async googleAuth(@Request() req: any) {
+    if (!googleEnabled) {
+      return { message: 'Google OAuth no está habilitado' };
+    }
+  }
 
   @Get('google/callback')
   @UseGuards(GoogleOAuthGuard)
   async googleAuthRedirect(@Request() req: any, @Res() res: any) {
+    if (!googleEnabled) {
+      const frontendUrl = this.configService.get<string>('FRONTEND_URL');
+      return res.redirect(`${frontendUrl}/login?error=${encodeURIComponent('Google OAuth no está habilitado')}`);
+    }
     try {
       const result = await this.authService.googleLogin(req);
       const frontendUrl = this.configService.get<string>('FRONTEND_URL');
