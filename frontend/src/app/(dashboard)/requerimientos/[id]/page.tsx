@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { useAuthStore } from '@/store/authStore';
 import { useRequerimientosStore } from '@/store/requerimientosStore';
 import { EstadoBadge, PrioridadBadge } from '@/components/ui/Badge';
@@ -28,6 +28,7 @@ type ModalAction =
   | null;
 
 export default function RequerimientoDetallePage() {
+  const router = useRouter();
   const params = useParams();
   const id = Number(params.id);
   const user = useAuthStore((s) => s.user);
@@ -63,8 +64,12 @@ export default function RequerimientoDetallePage() {
   }, [req]);
 
   useEffect(() => {
+    if (user?.rol === 'PROVEEDOR') {
+      router.replace('/dashboard');
+      return;
+    }
     fetchById(id);
-  }, [fetchById, id]);
+  }, [fetchById, id, user, router]);
 
   const handleEnviar = async () => {
     setActionLoading(true);

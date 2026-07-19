@@ -214,6 +214,7 @@ function LoginPageContent() {
                   { rol: 'Trabajador', email: 'trabajador@sgca.com' },
                   { rol: 'Jefe de Area', email: 'jefe@sgca.com' },
                   { rol: 'Admin', email: 'admin@sgca.com' },
+                  { rol: 'Proveedor', email: 'proveedor@sgca.com' },
                 ].map((c) => (
                   <button
                     key={c.email}

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/store/authStore';
 import { useRequerimientosStore } from '@/store/requerimientosStore';
 import { EstadoBadge, PrioridadBadge } from '@/components/ui/Badge';
@@ -20,6 +21,7 @@ const ESTADOS: EstadoRequerimiento[] = [
 const PRIORIDADES: Prioridad[] = ['BAJA', 'MEDIA', 'ALTA', 'URGENTE'];
 
 export default function RequerimientosPage() {
+  const router = useRouter();
   const user = useAuthStore((s) => s.user);
   const { requerimientos, fetchAll, fetchPendientes, isLoading } = useRequerimientosStore();
 
@@ -32,8 +34,12 @@ export default function RequerimientosPage() {
   const canCreateRequerimiento = ['TRABAJADOR', 'ADMIN'].includes(user?.rol || '');
 
   useEffect(() => {
+    if (user?.rol === 'PROVEEDOR') {
+      router.replace('/dashboard');
+      return;
+    }
     fetchAll();
-  }, []);
+  }, [user, router, fetchAll]);
 
   const filtered = requerimientos.filter((r: Requerimiento) => {
     const matchSearch =
