@@ -8,6 +8,7 @@ import {
   Post,
   Put,
   Query,
+  Request,
   UseGuards,
 } from '@nestjs/common';
 import { Rol } from '@prisma/client';
@@ -15,6 +16,7 @@ import { Roles } from '../common/decorators/roles.decorator';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { CreateProductoDto } from './dto/create-producto.dto';
+import { CreateProductoFromRequerimientoDto } from './dto/create-producto-from-requerimiento.dto';
 import { UpdateProductoDto } from './dto/update-producto.dto';
 import { ProductosService } from './productos.service';
 
@@ -33,10 +35,19 @@ export class ProductosController {
     return this.productosService.findOne(id);
   }
 
-  @Roles(Rol.ADMIN, Rol.GERENTE, Rol.ANALISTA_COMPRAS, Rol.ENCARGADO_ALMACEN)
+  @Roles(Rol.ADMIN, Rol.GERENTE, Rol.ANALISTA_COMPRAS, Rol.ENCARGADO_ALMACEN, Rol.JEFE_AREA)
   @Post()
   create(@Body() dto: CreateProductoDto) {
     return this.productosService.create(dto);
+  }
+
+  @Roles(Rol.TRABAJADOR, Rol.ADMIN)
+  @Post('desde-requerimiento')
+  createFromRequerimiento(
+    @Body() dto: CreateProductoFromRequerimientoDto,
+    @Request() req: { user: { id: number } },
+  ) {
+    return this.productosService.createFromRequerimiento(dto, req.user.id);
   }
 
   @Roles(Rol.ADMIN, Rol.GERENTE, Rol.ANALISTA_COMPRAS, Rol.ENCARGADO_ALMACEN)

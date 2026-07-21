@@ -40,7 +40,7 @@ export class NotificacionesService {
 
   async findByUsuario(userId: number) {
     return this.prisma.notificacion.findMany({
-      where: { receptorId: userId },
+      where: { receptorId: userId, leida: false },
       select: {
         ...this.getBaseSelect(),
         emisor: { select: { id: true, nombre: true, apellido: true } },
@@ -48,6 +48,19 @@ export class NotificacionesService {
       },
       orderBy: { createdAt: 'desc' },
       take: 50,
+    });
+  }
+
+  async findByUsuarioHistorial(userId: number) {
+    return this.prisma.notificacion.findMany({
+      where: { receptorId: userId },
+      select: {
+        ...this.getBaseSelect(),
+        emisor: { select: { id: true, nombre: true, apellido: true } },
+        requerimiento: { select: { id: true, codigo: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 100,
     });
   }
 

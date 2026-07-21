@@ -79,6 +79,63 @@ export const usersApi = {
   },
 };
 
+// ── Auth / Perfil ───────────────────────────────────────────────────────
+export const authApi = {
+  updateProfile: async (data: {
+    nombre?: string;
+    apellido?: string;
+    email?: string;
+  }) => {
+    const response = await api.patch<Usuario>('/auth/profile', data);
+    return response.data;
+  },
+
+  changePassword: async (data: {
+    currentPassword: string;
+    newPassword: string;
+  }) => {
+    const response = await api.patch<{ message: string }>('/auth/change-password', data);
+    return response.data;
+  },
+};
+
+// ── Notificaciones ───────────────────────────────────────────────────────
+export const notificacionesApi = {
+  getAll: async () => {
+    const response = await api.get<any[]>('/notificaciones');
+    return response.data;
+  },
+
+  getHistorial: async () => {
+    const response = await api.get<any[]>('/notificaciones/historial');
+    return response.data;
+  },
+
+  marcarLeida: async (id: number) => {
+    const response = await api.patch(`/notificaciones/${id}/leer`);
+    return response.data;
+  },
+
+  marcarTodasLeidas: async () => {
+    const response = await api.patch('/notificaciones/leer-todas');
+    return response.data;
+  },
+};
+
+// ── Productos ───────────────────────────────────────────────────────────────
+export const productosApi = {
+  createFromRequerimiento: async (data: {
+    nombre: string;
+    descripcion?: string;
+    unidadMedida: string;
+    categoria: string;
+    precioReferencial?: number;
+  }) => {
+    const response = await api.post('/productos/desde-requerimiento', data);
+    return response.data;
+  },
+};
+
 // ── Órdenes de Compra ───────────────────────────────────────────────────────
 export const ordenesCompraApi = {
   getAll: async () => {

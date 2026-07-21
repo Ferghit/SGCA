@@ -1,7 +1,9 @@
-import { Controller, Post, Body, Get, UseGuards, Request, Res } from '@nestjs/common';
+import { Controller, Post, Body, Get, Patch, UseGuards, Request, Res } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
+import { UpdateProfileDto } from './dto/update-profile.dto';
+import { ChangePasswordDto } from './dto/change-password.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { GoogleOAuthGuard } from '../common/guards/google-oauth.guard';
 import { ConfigService } from '@nestjs/config';
@@ -59,5 +61,17 @@ export class AuthController {
   @Get('profile')
   getProfile(@Request() req: any) {
     return this.authService.getProfile(req.user.id);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Patch('profile')
+  updateProfile(@Body() dto: UpdateProfileDto, @Request() req: any) {
+    return this.authService.updateProfile(req.user.id, dto);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Patch('change-password')
+  changePassword(@Body() dto: ChangePasswordDto, @Request() req: any) {
+    return this.authService.changePassword(req.user.id, dto);
   }
 }

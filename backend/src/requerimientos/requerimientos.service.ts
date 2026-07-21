@@ -177,6 +177,22 @@ export class RequerimientosService {
     const codigo = await this.generarCodigo();
     const payload = this.mapRequerimientoData(dto);
 
+    // Validar que todos los productos existan en el catálogo
+    const productoIds = payload.detalles.map((d) => d.productoId);
+    const productos = await this.prisma.producto.findMany({
+      where: { id: { in: productoIds } },
+      select: { id: true },
+    });
+
+    const productosEncontrados = new Set(productos.map((p) => p.id));
+    const productosFaltantes = productoIds.filter((id) => !productosEncontrados.has(id));
+
+    if (productosFaltantes.length > 0) {
+      throw new BadRequestException(
+        `Los siguientes productos no existen en el catálogo: ${productosFaltantes.join(', ')}`,
+      );
+    }
+
     return this.prisma.requerimiento.create({
       data: {
         codigo,

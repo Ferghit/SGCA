@@ -20,6 +20,11 @@ export class NotificacionesController {
     return this.service.findByUsuario(req.user.id);
   }
 
+  @Get('historial')
+  getHistorial(@Request() req: any) {
+    return this.service.findByUsuarioHistorial(req.user.id);
+  }
+
   @Get('no-leidas/count')
   countNoLeidas(@Request() req: any) {
     return this.service.contarNoLeidas(req.user.id);

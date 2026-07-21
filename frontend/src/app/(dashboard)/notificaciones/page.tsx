@@ -1,19 +1,22 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import api from '@/lib/api';
+import { notificacionesApi } from '@/lib/api';
 import { Notificacion } from '@/types';
 import { formatDateTime } from '@/lib/utils';
-import { Bell, CheckCheck, Mail, MailOpen } from 'lucide-react';
+import { Bell, CheckCheck, Mail, MailOpen, History, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 
 export default function NotificacionesPage() {
   const [notificaciones, setNotificaciones] = useState<Notificacion[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [viewHistorial, setViewHistorial] = useState(false);
 
   const fetchNotifs = async () => {
     try {
-      const { data } = await api.get('/notificaciones');
+      const data = viewHistorial
+        ? await notificacionesApi.getHistorial()
+        : await notificacionesApi.getAll();
       setNotificaciones(data);
     } catch {
       // silencioso
@@ -22,16 +25,25 @@ export default function NotificacionesPage() {
     }
   };
 
-  useEffect(() => { fetchNotifs(); }, []);
+  useEffect(() => { fetchNotifs(); }, [viewHistorial]);
 
   const marcarLeida = async (id: number) => {
-    await api.patch(`/notificaciones/${id}/leer`);
-    setNotificaciones((prev) => prev.map((n) => n.id === id ? { ...n, leida: true } : n));
+    await notificacionesApi.marcarLeida(id);
+    // Si estamos en vista de no leídas, remover la notificación
+    if (!viewHistorial) {
+      setNotificaciones((prev) => prev.filter((n) => n.id !== id));
+    } else {
+      setNotificaciones((prev) => prev.map((n) => n.id === id ? { ...n, leida: true } : n));
+    }
   };
 
   const marcarTodasLeidas = async () => {
-    await api.patch('/notificaciones/leer-todas');
-    setNotificaciones((prev) => prev.map((n) => ({ ...n, leida: true })));
+    await notificacionesApi.marcarTodasLeidas();
+    if (!viewHistorial) {
+      setNotificaciones([]);
+    } else {
+      setNotificaciones((prev) => prev.map((n) => ({ ...n, leida: true })));
+    }
   };
 
   const noLeidas = notificaciones.filter((n) => !n.leida).length;
@@ -40,20 +52,44 @@ export default function NotificacionesPage() {
     <div className="max-w-2xl mx-auto space-y-5">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="page-title">Notificaciones</h1>
+          <h1 className="page-title">
+            {viewHistorial ? 'Historial de Notificaciones' : 'Notificaciones'}
+          </h1>
           <p className="text-sm text-gray-500 mt-0.5">
-            {noLeidas > 0 ? `${noLeidas} sin leer` : 'Todas leidas'}
+            {viewHistorial
+              ? `${notificaciones.length} notificaciones en total`
+              : noLeidas > 0
+              ? `${noLeidas} sin leer`
+              : 'Todas leidas'}
           </p>
         </div>
-        {noLeidas > 0 && (
+        <div className="flex items-center gap-2">
+          {!viewHistorial && noLeidas > 0 && (
+            <button
+              onClick={marcarTodasLeidas}
+              className="flex items-center gap-2 text-sm font-medium px-3 py-2 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors text-gray-600"
+            >
+              <CheckCheck className="w-4 h-4" />
+              Marcar todas como leidas
+            </button>
+          )}
           <button
-            onClick={marcarTodasLeidas}
+            onClick={() => setViewHistorial(!viewHistorial)}
             className="flex items-center gap-2 text-sm font-medium px-3 py-2 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors text-gray-600"
           >
-            <CheckCheck className="w-4 h-4" />
-            Marcar todas como leidas
+            {viewHistorial ? (
+              <>
+                <ArrowLeft className="w-4 h-4" />
+                Volver
+              </>
+            ) : (
+              <>
+                <History className="w-4 h-4" />
+                Historial
+              </>
+            )}
           </button>
-        )}
+        </div>
       </div>
 
       <div className="bg-white rounded-xl border border-gray-100 shadow-card overflow-hidden">
@@ -64,7 +100,9 @@ export default function NotificacionesPage() {
         ) : notificaciones.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 text-gray-400">
             <Bell className="w-14 h-14 mb-4 opacity-20" />
-            <p className="font-medium text-gray-500">No tienes notificaciones</p>
+            <p className="font-medium text-gray-500">
+              {viewHistorial ? 'No hay notificaciones en el historial' : 'No tienes notificaciones'}
+            </p>
           </div>
         ) : (
           <div className="divide-y divide-gray-50">

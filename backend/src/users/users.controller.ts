@@ -27,15 +27,17 @@ export class UsersController {
     return this.usersService.findAll();
   }
 
-  @Get('por-rol')
-  findByRol(@Query('rol') rol: string) {
-    return this.usersService.findByRol(rol);
-  }
+  // Endpoint deshabilitado por seguridad - filtrar usuarios por rol expone información sensible
+  // @Get('por-rol')
+  // findByRol(@Query('rol') rol: string) {
+  //   return this.usersService.findByRol(rol);
+  // }
 
-  @Get(':id')
-  findOne(@Param('id', ParseIntPipe) id: number) {
-    return this.usersService.findOne(id);
-  }
+  // Endpoint deshabilitado por seguridad - exponer información individual de usuarios es sensible
+  // @Get(':id')
+  // findOne(@Param('id', ParseIntPipe) id: number) {
+  //   return this.usersService.findOne(id);
+  // }
 
   @Roles(Rol.ADMIN)
   @Post()

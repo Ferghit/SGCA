@@ -5,7 +5,8 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuthStore } from '@/store/authStore';
 import { useRequerimientosStore } from '@/store/requerimientosStore';
 import { Producto, Prioridad, Requerimiento } from '@/types';
-import api from '@/lib/api';
+import api, { productosApi } from '@/lib/api';
+import { Modal } from '@/components/ui/Modal';
 import { getDateInputValue, getLocalDateInputValue } from '@/lib/utils';
 import {
   ArrowLeft,
@@ -15,6 +16,7 @@ import {
   CheckCircle,
   Send,
   FilePenLine,
+  PackagePlus,
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -26,6 +28,31 @@ interface DetalleForm {
 }
 
 type SubmitAction = 'draft' | 'submit';
+
+type NuevoProductoForm = {
+  nombre: string;
+  descripcion: string;
+  unidadMedida: string;
+  categoria: string;
+  precioReferencial: string;
+};
+
+const CATEGORIAS_SUGERIDAS = [
+  'Utiles de Oficina',
+  'Insumos de Impresion',
+  'Equipos de Computo',
+  'Limpieza e Higiene',
+  'Mobiliario',
+  'Otros',
+];
+
+const EMPTY_NUEVO_PRODUCTO: NuevoProductoForm = {
+  nombre: '',
+  descripcion: '',
+  unidadMedida: '',
+  categoria: '',
+  precioReferencial: '',
+};
 
 const PRIORIDADES: { value: Prioridad; label: string; desc: string }[] = [
   { value: 'BAJA', label: 'Baja', desc: 'Sin urgencia' },
@@ -61,6 +88,11 @@ export default function NuevoRequerimientoPage() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [submitAction, setSubmitAction] = useState<SubmitAction>('draft');
+  const [showNuevoProductoModal, setShowNuevoProductoModal] = useState(false);
+  const [detalleIndexForProducto, setDetalleIndexForProducto] = useState(0);
+  const [nuevoProducto, setNuevoProducto] = useState<NuevoProductoForm>(EMPTY_NUEVO_PRODUCTO);
+  const [nuevoProductoError, setNuevoProductoError] = useState('');
+  const [isCreatingProducto, setIsCreatingProducto] = useState(false);
 
   const latestObservation = useMemo(() => {
     if (!editableRequerimiento) return '';
@@ -154,6 +186,62 @@ export default function NuevoRequerimientoPage() {
     setDetalles(updated);
   };
 
+  const openNuevoProductoModal = (index: number) => {
+    setDetalleIndexForProducto(index);
+    setNuevoProducto({
+      ...EMPTY_NUEVO_PRODUCTO,
+      unidadMedida: detalles[index]?.unidadMedida || '',
+    });
+    setNuevoProductoError('');
+    setShowNuevoProductoModal(true);
+  };
+
+  const handleCreateProducto = async () => {
+    setNuevoProductoError('');
+
+    if (!nuevoProducto.nombre.trim() || !nuevoProducto.unidadMedida.trim() || !nuevoProducto.categoria.trim()) {
+      setNuevoProductoError('Completa nombre, categoría y unidad de medida.');
+      return;
+    }
+
+    setIsCreatingProducto(true);
+    try {
+      const created = await productosApi.createFromRequerimiento({
+        nombre: nuevoProducto.nombre.trim(),
+        descripcion: nuevoProducto.descripcion.trim() || undefined,
+        unidadMedida: nuevoProducto.unidadMedida.trim(),
+        categoria: nuevoProducto.categoria.trim(),
+        precioReferencial: nuevoProducto.precioReferencial
+          ? Number(nuevoProducto.precioReferencial)
+          : undefined,
+      });
+
+      setProductos((prev) =>
+        [...prev, created].sort((a, b) => a.nombre.localeCompare(b.nombre, 'es')),
+      );
+
+      setDetalles((prev) => {
+        const updated = [...prev];
+        updated[detalleIndexForProducto] = {
+          ...updated[detalleIndexForProducto],
+          productoId: created.id,
+          unidadMedida: created.unidadMedida,
+        };
+        return updated;
+      });
+      setShowNuevoProductoModal(false);
+      setNuevoProducto(EMPTY_NUEVO_PRODUCTO);
+      setSuccess(`Producto "${created.nombre}" registrado en el catálogo. El administrador fue notificado.`);
+      setTimeout(() => setSuccess(''), 5000);
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { message?: string | string[] } } };
+      const msg = e.response?.data?.message;
+      setNuevoProductoError(Array.isArray(msg) ? msg.join(', ') : msg || 'No se pudo registrar el producto.');
+    } finally {
+      setIsCreatingProducto(false);
+    }
+  };
+
   const buildPayload = () => ({
     prioridad,
     fechaRequerida,
@@ -176,8 +264,8 @@ export default function NuevoRequerimientoPage() {
       return;
     }
 
-    if (productos.length === 0) {
-      setError('No hay productos activos disponibles para generar el requerimiento.');
+    if (productos.length === 0 && detalles.some((d) => !d.productoId)) {
+      setError('Agrega al menos un producto al requerimiento o registra uno nuevo en el catálogo.');
       return;
     }
 
@@ -232,7 +320,6 @@ export default function NuevoRequerimientoPage() {
   const disableForm =
     isLoading ||
     isLoadingProductos ||
-    productos.length === 0 ||
     (isEditMode && !!editableRequerimiento && !['BORRADOR', 'EN_REVISION'].includes(editableRequerimiento.estado));
 
   return (
@@ -355,8 +442,8 @@ export default function NuevoRequerimientoPage() {
           {isLoadingProductos ? (
             <p className="text-sm text-gray-500">Cargando catalogo de productos...</p>
           ) : productos.length === 0 ? (
-            <div className="p-3 rounded-lg bg-amber-50 border border-amber-200 text-sm text-amber-700">
-              No hay productos activos registrados. Solicita a un administrador que cree el catalogo.
+            <div className="p-3 rounded-lg bg-blue-50 border border-blue-200 text-sm text-blue-700">
+              El catálogo está vacío. Usa &quot;Registrar nuevo producto&quot; en la fila del detalle para agregar el primer ítem.
             </div>
           ) : null}
 
@@ -383,19 +470,33 @@ export default function NuevoRequerimientoPage() {
                     <label className="label-field">
                       Producto <span className="text-red-500">*</span>
                     </label>
-                    <select
-                      value={det.productoId || ''}
-                      onChange={(e) => updateDetalle(index, 'productoId', e.target.value)}
-                      className="input-field"
-                      required
-                    >
-                      <option value="">-- Selecciona un producto --</option>
-                      {productos.map((p) => (
-                        <option key={p.id} value={p.id}>
-                          [{p.codigo}] {p.nombre} ({p.categoria})
-                        </option>
-                      ))}
-                    </select>
+                    <div className="flex flex-col sm:flex-row gap-2">
+                      <select
+                        value={det.productoId || ''}
+                        onChange={(e) => updateDetalle(index, 'productoId', e.target.value)}
+                        className="input-field flex-1"
+                        required
+                      >
+                        <option value="">-- Selecciona un producto --</option>
+                        {productos.map((p) => (
+                          <option key={p.id} value={p.id}>
+                            [{p.codigo}] {p.nombre} ({p.categoria})
+                          </option>
+                        ))}
+                      </select>
+                      <button
+                        type="button"
+                        onClick={() => openNuevoProductoModal(index)}
+                        className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium border transition-colors shrink-0"
+                        style={{ color: '#006D77', borderColor: '#006D77' }}
+                      >
+                        <PackagePlus className="w-4 h-4" />
+                        Registrar nuevo
+                      </button>
+                    </div>
+                    <p className="text-xs text-gray-400 mt-1">
+                      Si el producto no está en el catálogo, regístralo aquí. Se notificará al administrador.
+                    </p>
                   </div>
 
                   <div>
@@ -475,6 +576,121 @@ export default function NuevoRequerimientoPage() {
           </button>
         </div>
       </div>
+
+      <Modal
+        isOpen={showNuevoProductoModal}
+        onClose={() => !isCreatingProducto && setShowNuevoProductoModal(false)}
+        title="Registrar nuevo producto"
+        maxWidthClass="max-w-lg"
+        footer={
+          <>
+            <button
+              type="button"
+              onClick={() => setShowNuevoProductoModal(false)}
+              disabled={isCreatingProducto}
+              className="px-4 py-2 rounded-lg text-sm border border-gray-200 hover:bg-gray-50 disabled:opacity-50"
+            >
+              Cancelar
+            </button>
+            <button
+              type="button"
+              onClick={handleCreateProducto}
+              disabled={isCreatingProducto}
+              className="px-4 py-2 rounded-lg text-sm font-medium text-white disabled:opacity-50"
+              style={{ backgroundColor: '#006D77' }}
+            >
+              {isCreatingProducto ? 'Registrando...' : 'Agregar al catálogo'}
+            </button>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          {nuevoProductoError && (
+            <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+              {nuevoProductoError}
+            </div>
+          )}
+
+          <p className="text-sm text-gray-600">
+            El producto se agregará al catálogo y quedará seleccionado en este requerimiento.
+            El administrador recibirá una notificación con tu usuario y la fecha del registro.
+          </p>
+
+          <div>
+            <label className="label-field">
+              Nombre del producto <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="text"
+              value={nuevoProducto.nombre}
+              onChange={(e) => setNuevoProducto((prev) => ({ ...prev, nombre: e.target.value }))}
+              className="input-field"
+              placeholder="Ej: Marcador permanente negro"
+              maxLength={150}
+            />
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="label-field">
+                Categoría <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                list="categorias-producto"
+                value={nuevoProducto.categoria}
+                onChange={(e) => setNuevoProducto((prev) => ({ ...prev, categoria: e.target.value }))}
+                className="input-field"
+                placeholder="Utiles de Oficina"
+                maxLength={100}
+              />
+              <datalist id="categorias-producto">
+                {CATEGORIAS_SUGERIDAS.map((categoria) => (
+                  <option key={categoria} value={categoria} />
+                ))}
+              </datalist>
+            </div>
+            <div>
+              <label className="label-field">
+                Unidad de medida <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                value={nuevoProducto.unidadMedida}
+                onChange={(e) => setNuevoProducto((prev) => ({ ...prev, unidadMedida: e.target.value }))}
+                className="input-field"
+                placeholder="Unidad, Caja, Resma..."
+                maxLength={50}
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="label-field">Precio referencial (opcional)</label>
+            <input
+              type="number"
+              min="0.01"
+              step="0.01"
+              value={nuevoProducto.precioReferencial}
+              onChange={(e) => setNuevoProducto((prev) => ({ ...prev, precioReferencial: e.target.value }))}
+              className="input-field"
+              placeholder="0.00"
+            />
+          </div>
+
+          <div>
+            <label className="label-field">Descripción (opcional)</label>
+            <textarea
+              value={nuevoProducto.descripcion}
+              onChange={(e) => setNuevoProducto((prev) => ({ ...prev, descripcion: e.target.value }))}
+              className="input-field resize-none"
+              rows={3}
+              placeholder="Detalles adicionales del producto..."
+              maxLength={500}
+            />
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }

@@ -12,14 +12,18 @@ import { GoogleStrategy } from './strategies/google.strategy';
     PassportModule,
     JwtModule.registerAsync({
       inject: [ConfigService],
-      useFactory: (config: ConfigService) => ({
-        secret:
-          config.get<string>('JWT_SECRET') ||
-          'sgca-jwt-ultra-secret-key-unt-sistemas-2026',
-        signOptions: {
-          expiresIn: config.get<string>('JWT_EXPIRES_IN') || '24h',
-        },
-      }),
+      useFactory: (config: ConfigService) => {
+        const secret = config.get<string>('JWT_SECRET');
+        if (!secret) {
+          throw new Error('JWT_SECRET environment variable is required');
+        }
+        return {
+          secret,
+          signOptions: {
+            expiresIn: config.get<string>('JWT_EXPIRES_IN') || '24h',
+          },
+        };
+      },
     }),
   ],
   controllers: [AuthController],
