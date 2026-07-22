@@ -7,6 +7,7 @@ import {
   RotateCcw, Send, Sparkles, Square, Volume2, X,
 } from 'lucide-react';
 import { chatbotApi } from '@/lib/api';
+import { useAuthStore } from '@/store/authStore';
 
 type MessageRole = 'user' | 'assistant';
 interface ChatMessage { id: string; role: MessageRole; content: string; }
@@ -34,7 +35,9 @@ declare global {
   }
 }
 
-const STORAGE_KEY = 'sgca-chat-history';
+const LEGACY_STORAGE_KEY = 'sgca-chat-history';
+const STORAGE_KEY_PREFIX = 'sgca-chat-history';
+const ACTIVE_IDENTITY_KEY = 'sgca-chat-active-identity';
 const WELCOME_MESSAGE: ChatMessage = {
   id: 'welcome',
   role: 'assistant',
@@ -110,6 +113,9 @@ function FormattedMessage({ content }: { content: string }) {
 
 export default function Chatbot() {
   const pathname = usePathname();
+  const user = useAuthStore((state) => state.user);
+  const identity = user ? `${user.id}:${user.rol}` : 'anonymous';
+  const storageKey = `${STORAGE_KEY_PREFIX}:${identity}`;
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([WELCOME_MESSAGE]);
   const [input, setInput] = useState('');
@@ -117,7 +123,7 @@ export default function Chatbot() {
   const [isListening, setIsListening] = useState(false);
   const [speakingId, setSpeakingId] = useState<string | null>(null);
   const [error, setError] = useState('');
-  const [historyLoaded, setHistoryLoaded] = useState(false);
+  const [loadedStorageKey, setLoadedStorageKey] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const recognitionRef = useRef<BrowserSpeechRecognition | null>(null);
@@ -130,23 +136,45 @@ export default function Chatbot() {
 
   useEffect(() => {
     try {
-      const stored = sessionStorage.getItem(STORAGE_KEY);
-      if (stored) {
-        const parsed = JSON.parse(stored) as ChatMessage[];
+      const previousIdentity = sessionStorage.getItem(ACTIVE_IDENTITY_KEY);
+      const identityChanged = Boolean(previousIdentity && previousIdentity !== identity);
+
+      // El historial antiguo no estaba aislado por usuario y no debe reutilizarse.
+      sessionStorage.removeItem(LEGACY_STORAGE_KEY);
+
+      if (identityChanged) {
+        sessionStorage.removeItem(storageKey);
+        setMessages([WELCOME_MESSAGE]);
+        setInput('');
+        setError('');
+        window.speechSynthesis?.cancel();
+        setSpeakingId(null);
+      } else {
+        const stored = sessionStorage.getItem(storageKey);
+        const parsed = stored ? JSON.parse(stored) as ChatMessage[] : null;
         if (Array.isArray(parsed) && parsed.every((item) =>
           typeof item?.id === 'string' && ['user', 'assistant'].includes(item?.role) && typeof item?.content === 'string',
-        )) setMessages(parsed.slice(-30));
+        )) {
+          setMessages(parsed.slice(-30));
+        } else {
+          setMessages([WELCOME_MESSAGE]);
+        }
       }
+
+      sessionStorage.setItem(ACTIVE_IDENTITY_KEY, identity);
     } catch {
-      sessionStorage.removeItem(STORAGE_KEY);
+      sessionStorage.removeItem(storageKey);
+      setMessages([WELCOME_MESSAGE]);
     } finally {
-      setHistoryLoaded(true);
+      setLoadedStorageKey(storageKey);
     }
-  }, []);
+  }, [identity, storageKey]);
 
   useEffect(() => {
-    if (historyLoaded) sessionStorage.setItem(STORAGE_KEY, JSON.stringify(messages.slice(-30)));
-  }, [historyLoaded, messages]);
+    if (loadedStorageKey === storageKey) {
+      sessionStorage.setItem(storageKey, JSON.stringify(messages.slice(-30)));
+    }
+  }, [loadedStorageKey, messages, storageKey]);
 
   useEffect(() => {
     if (isOpen) messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
