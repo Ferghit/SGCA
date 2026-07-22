@@ -11,6 +11,7 @@ import { ProductosModule } from './productos/productos.module';
 import { OrdenesCompraModule } from './ordenes-compra/ordenes-compra.module';
 import { ContabilidadModule } from './contabilidad/contabilidad.module';
 import { ReportesModule } from './reportes/reportes.module';
+import { ChatbotModule } from './chatbot/chatbot.module';
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { ReportesModule } from './reportes/reportes.module';
     OrdenesCompraModule,
     ContabilidadModule,
     ReportesModule,
+    ChatbotModule,
   ],
 })
 export class AppModule {}

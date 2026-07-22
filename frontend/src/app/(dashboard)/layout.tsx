@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/store/authStore';
 import Navbar from '@/components/layout/Navbar';
 import Sidebar from '@/components/layout/Sidebar';
+import Chatbot from '@/components/chatbot/Chatbot';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, hasHydrated } = useAuthStore();
@@ -45,6 +46,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           {children}
         </main>
       </div>
+      <Chatbot />
     </div>
   );
 }

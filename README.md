@@ -106,6 +106,16 @@ copy .env.example .env
 # Edita .env si tu usuario/contrasena de PostgreSQL es diferente
 ```
 
+Configurar el asistente virtual en `backend/.env`:
+
+```env
+GROQ_API_KEY=apikey
+GROQ_MODEL=llama-3.3-70b-versatile
+```
+
+Reemplaza `apikey` por una clave válida de Groq. La clave se utiliza únicamente
+desde el backend y nunca debe declararse con el prefijo `NEXT_PUBLIC_`.
+
 Crear las tablas y ejecutar el seed:
 ```bash
 npm run prisma:migrate     # Crea todas las tablas
@@ -121,7 +131,7 @@ npm run start:dev
 ### 4. Instalar y configurar el Frontend
 
 ```bash
-cd ../frontend
+cd frontend
 npm install
 npm run dev
 # App disponible en: http://localhost:3000
@@ -174,6 +184,15 @@ GET    /api/notificaciones/no-leidas/count
 PATCH  /api/notificaciones/:id/leer    - Marcar como leida
 PATCH  /api/notificaciones/leer-todas  - Marcar todas como leidas
 ```
+
+### Asistente virtual
+```
+POST   /api/chatbot/chat               - Enviar una consulta al asistente (requiere JWT)
+```
+
+El panel flotante está disponible en todas las pantallas autenticadas. Admite
+entrada escrita, dictado por micrófono y lectura en voz alta en navegadores
+compatibles con Web Speech API.
 
 ### Usuarios
 ```

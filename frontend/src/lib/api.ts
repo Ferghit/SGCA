@@ -5,6 +5,7 @@ import type {
   IncidenciaProveedor,
   OrdenCompra,
   Pago,
+  Rol,
 } from '../types';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
@@ -14,7 +15,7 @@ export interface Usuario {
   nombre: string;
   apellido: string;
   email: string;
-  rol: string;
+  rol: Rol;
   activo: boolean;
   createdAt: string;
 }
@@ -95,6 +96,27 @@ export const authApi = {
     newPassword: string;
   }) => {
     const response = await api.patch<{ message: string }>('/auth/change-password', data);
+    return response.data;
+  },
+};
+
+// -- Asistente virtual ---------------------------------------------------------
+export interface ChatbotMessage {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
+export const chatbotApi = {
+  chat: async (data: {
+    message: string;
+    history?: ChatbotMessage[];
+    currentPath?: string;
+  }) => {
+    const response = await api.post<{ reply: string; model: string }>(
+      '/chatbot/chat',
+      data,
+      { timeout: 45000 },
+    );
     return response.data;
   },
 };
